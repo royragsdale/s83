@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -12,9 +14,16 @@ import (
 	"unicode/utf8"
 )
 
+// SpringVersion for use in http headers
+const SpringVersion = "83"
+
 const keyLen = 64
 const sigLen = 128
+
+const maxNumBoards = 10_000_000
+
 const maxBoardLen = 2217
+
 const TestPublic = "fad415fbaa0339c4fd372d8287e50f67905321ccfd9c43fa4c20ac40afed1983"
 const TestPrivate = "a7e4d1c8be858d683ab9cb15574bd0bc3a87e6c846cdaf848da498909cb574f7"
 
@@ -152,3 +161,27 @@ func (b Board) VerifySignature() bool {
 
 // TODO: function to parse timestamp from HTML meta tag.
 //func (b Board) ParseTimeStamp() time.Time {
+
+// TODO: level of precision for difficulty factor?
+// difficultyFactor = ( numBoards / 10_000_000 )**4
+func DifficultyFactor(numBoards int) float64 {
+	return math.Pow(float64(numBoards)/maxNumBoards, 4)
+}
+
+// maxKey = (2**256 - 1)
+func maxKey() *big.Int {
+	maxKey := big.NewInt(2)
+	maxKey.Exp(maxKey, big.NewInt(256), nil)
+	maxKey.Sub(maxKey, big.NewInt(1))
+	return maxKey
+}
+
+// keyThreshold = maxKey * ( 1.0 - difficultyFactor )
+func KeyThreshold(difficultyFactor float64) *big.Int {
+	threshold := new(big.Float)
+	threshold.Sub(big.NewFloat(1), big.NewFloat(difficultyFactor))
+	threshold.Mul(threshold, new(big.Float).SetInt(maxKey()))
+
+	res, _ := threshold.Int(nil)
+	return res
+}
