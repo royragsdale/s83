@@ -45,7 +45,7 @@ func NewCreator() (Creator, error) {
 
 func NewCreatorFromKey(privateKeyHex string) (Creator, error) {
 	if len(privateKeyHex) != keyLen {
-		return Creator{}, errors.New("Invalid privatekey length")
+		return Creator{}, errors.New("Invalid key length")
 	}
 	// "crypto/ed2551's private key representation includes a public key suffix...
 	// refers to the RFC 8032 private key as the “seed”"
@@ -124,7 +124,7 @@ func (p Publisher) valid() bool {
 	if err != nil {
 		return false
 	}
-	curYear, _, _ := time.Now().Date()
+	curYear := time.Now().Year()
 
 	return (curYear-1 <= keyYear) && (keyYear <= curYear)
 }
@@ -137,8 +137,8 @@ func (s Signature) String() string {
 
 type Board struct {
 	Publisher Publisher
-	Timestamp time.Time
-	Signature Signature
+	timestamp time.Time
+	signature Signature
 	Content   []byte
 }
 
@@ -147,7 +147,7 @@ func (b Board) String() string {
 }
 
 func (b Board) VerifySignature() bool {
-	return ed25519.Verify(b.Publisher.PublicKey, b.Content, b.Signature)
+	return ed25519.Verify(b.Publisher.PublicKey, b.Content, b.signature)
 }
 
 // TODO: function to parse timestamp from HTML meta tag.
