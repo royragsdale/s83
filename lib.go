@@ -37,19 +37,18 @@ func genCreator() (Creator, error) {
 	return Creator{priv, Publisher{pub}}, err
 }
 
-func NewCreator() (Creator, error) {
+func NewCreator() (Creator, int, error) {
 	var err error
 	cnt := 0
 	c := Creator{}
 	for !c.Publisher.valid() {
 		c, err = genCreator()
 		if err != nil {
-			return c, err
+			return c, cnt, err
 		}
 		cnt += 1
 	}
-	fmt.Printf("found valid key in %d iterations\n", cnt)
-	return c, nil
+	return c, cnt, nil
 }
 
 func NewCreatorFromKey(privateKeyHex string) (Creator, error) {
@@ -71,6 +70,11 @@ func NewCreatorFromKey(privateKeyHex string) (Creator, error) {
 
 func (c Creator) String() string {
 	return c.Publisher.String()
+}
+
+func (c Creator) ExportPrivateKey() string {
+	// crypto/ed25519 keys include a public key suffix (strip for consistency with spec)
+	return hex.EncodeToString(c.PrivateKey)[:64]
 }
 
 func (c Creator) NewBoard(content []byte) (Board, error) {
