@@ -75,11 +75,6 @@ func (c Creator) String() string {
 
 func (c Creator) NewBoard(content []byte) (Board, error) {
 
-	// validate
-	if !utf8.Valid(content) {
-		return Board{}, errors.New("Invalid Board: not UTF-8")
-	}
-
 	// prepend timestamp tag
 	timestamp := time.Now().UTC()
 	httpTime := timestamp.Format(http.TimeFormat)
@@ -87,15 +82,9 @@ func (c Creator) NewBoard(content []byte) (Board, error) {
 	lastMod := []byte(fmt.Sprintf(lastModMeta, httpTime))
 	content = append(lastMod, content...)
 
-	if len(content) > maxBoardLen {
-		max := maxBoardLen - len(lastMod)
-		msg := fmt.Sprintf("Invalid Board: too large (%d). Max: %d (leaves room for timestamp) ", len(content), max)
-		return Board{}, errors.New(msg)
-	}
-
+	// create signature
 	sig := ed25519.Sign(c.PrivateKey, content)
-	return Board{c.Publisher, timestamp, sig, content}, nil
-
+	return NewBoard(c.Publisher.String(), sig, content)
 }
 
 type Publisher struct {
@@ -152,15 +141,54 @@ type Board struct {
 }
 
 func (b Board) String() string {
-	return fmt.Sprintf("%s sends:\n%s\nsig verifies: %t", b.Publisher, b.Content, b.VerifySignature())
+	return fmt.Sprintf("%s sends:\n%s\nsig verifies: %t\nsig: %s", b.Publisher, b.Content, b.VerifySignature(), hex.EncodeToString(b.signature))
 }
 
 func (b Board) VerifySignature() bool {
 	return ed25519.Verify(b.Publisher.PublicKey, b.Content, b.signature)
 }
 
-// TODO: function to parse timestamp from HTML meta tag.
-//func (b Board) ParseTimeStamp() time.Time {
+func NewBoard(key string, sig Signature, content []byte) (Board, error) {
+	board := Board{}
+	publisher, err := NewPublisherFromKey(key)
+	if err != nil {
+		return Board{}, err
+	}
+	board.Publisher = publisher
+
+	// validate encoding requirement
+	if !utf8.Valid(content) {
+		return Board{}, errors.New("Invalid Board: not UTF-8")
+	}
+	// validate size requirement
+	if len(content) > maxBoardLen {
+		return Board{}, errors.New("Invalid Board: too large")
+	}
+	board.Content = content
+
+	// validate signature (can we trust the content)
+	board.signature = sig
+	if !board.VerifySignature() {
+		return Board{}, errors.New("Invalid Signature")
+	}
+
+	// validate "last-modified meta tag"
+	ts, err := ParseTimestamp(content)
+	if err != nil {
+		return Board{}, err
+	}
+	board.timestamp = ts
+
+	// all checks pass, good board
+	return board, nil
+}
+
+// parse timestamp from HTML meta tag
+func ParseTimestamp(content []byte) (time.Time, error) {
+
+	// TODO
+	return time.Now(), nil
+}
 
 // TODO: level of precision for difficulty factor?
 // difficultyFactor = ( numBoards / 10_000_000 )**4

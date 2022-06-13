@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -14,6 +15,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("new creator: %s\n", creator)
+	fmt.Println("new creator :", creator)
+	fmt.Println("private     :", hex.EncodeToString(creator.PrivateKey))
+
+	board, err := creator.NewBoard([]byte("hello world"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(board)
 
 }
