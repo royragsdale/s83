@@ -38,8 +38,12 @@ func dispatchCommand(config Config) {
 	}
 
 	// Get boards from a server
-	// TODO: add flags to store, launch browser
+	// TODO: add flags to store, launch browser, set mod time (e.g. from local copy)
+	// TODO: saved list of boards to fetch (e.g. subscription)
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
+	getCmd.Usage = func() {
+		fmt.Fprintf(getCmd.Output(), "usage: get <public>\n")
+	}
 
 	if len(os.Args) < 2 {
 		fmt.Println("expected 'get', 'pub', or 'new' subcommand")
@@ -49,11 +53,9 @@ func dispatchCommand(config Config) {
 	// Check which subcommand is invoked.
 	switch os.Args[1] {
 
-	// For every subcommand, we parse its own flags and
-	// have access to trailing positional arguments.
 	case "new":
 		newCmd.Parse(os.Args[2:])
-		New(config, newCmd)
+		New()
 
 	case "pub":
 		pubCmd.Parse(os.Args[2:])
@@ -64,22 +66,29 @@ func dispatchCommand(config Config) {
 		}
 
 		if !config.Creator.Valid() {
-			fmt.Println("[ERROR] Invalid creator configutation.")
+			fmt.Println("[ERROR] Invalid creator configuration.")
 			fmt.Println("[info] use `s83 new` to a 'secret'")
 			fmt.Printf("[info] then add a 'secret=' line to your config file (%s)\n", configPath())
 			os.Exit(1)
 		}
 
 		if config.Server == nil {
-			fmt.Println("[ERROR] missing server configutation.")
+			fmt.Println("[ERROR] missing server configuration.")
 			fmt.Printf("[info] add a 'server=' line to your config file (%s)\n", configPath())
 			os.Exit(1)
 		}
+
 		Pub(config, pubCmd.Arg(0))
 
 	case "get":
 		getCmd.Parse(os.Args[2:])
-		fmt.Println("TODO: subcommand 'get' not yet implemented")
+		if getCmd.NArg() != 1 {
+			getCmd.Usage()
+			fmt.Println("<public> board to get is required")
+			os.Exit(1)
+		}
+
+		Get(config.Server, getCmd.Arg(0))
 
 	default:
 		fmt.Println("expected 'get', 'pub', or 'new' subcommand")
@@ -87,7 +96,7 @@ func dispatchCommand(config Config) {
 	}
 }
 
-func New(config Config, args *flag.FlagSet) {
+func New() {
 	fmt.Println("[info] Generating a new creator key. Please be patient.")
 	start := time.Now()
 
@@ -121,9 +130,8 @@ func Pub(config Config, path string) {
 
 func publishBoard(server *url.URL, board s83.Board) error {
 
-	// add publisher key
+	// add publisher key to URL
 	server.Path = path.Join(server.Path, board.Publisher.String())
-	fmt.Println(server.String())
 
 	client := &http.Client{}
 	req, err := http.NewRequest("PUT", server.String(), bytes.NewReader(board.Content))
@@ -149,6 +157,40 @@ func publishBoard(server *url.URL, board s83.Board) error {
 		msg := fmt.Sprintf("%s: %s", res.Status, body)
 		return errors.New(msg)
 	}
+}
+
+func Get(server *url.URL, key string) {
+	// sanity check key locally
+	_, err := s83.NewPublisherFromKey(key)
+	exitOnError(err)
+
+	// add publisher key to URL
+	server.Path = path.Join(server.Path, key)
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", server.String(), nil)
+	exitOnError(err)
+
+	// set headers
+	req.Header.Set("Spring-Version", s83.SpringVersion)
+	// TODO: optional
+	//req.Header.Set("If-Modified-Since", time.Now().UTC().Format(http.TimeFormat))
+
+	// make request
+	res, err := client.Do(req)
+	exitOnError(err)
+
+	board, err := s83.NewBoardFromHTTP(key, res.Header.Get("Authorization"), res.Body)
+	exitOnError(err)
+
+	// TODO: realm/trust management
+	// "If the signature is not valid,the client must drop the response and
+	// remove the server from its list of trustworthy peers
+
+	// TODO: situate each board inside its own Shadow DOM (combine multiple boards?)
+
+	// cli only at the moment > to a file and view in a browser
+	fmt.Print(board)
 }
 
 func exitOnError(err error) {

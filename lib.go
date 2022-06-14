@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"net/http"
@@ -150,10 +151,13 @@ type Board struct {
 }
 
 func (b Board) String() string {
-	return fmt.Sprintf("creator: %s\nsignature: %s\nverifies: %t\n%s", b.Publisher, b.signature, b.VerifySignature(), b.Content)
+	return fmt.Sprintf("verifies  : %t\ncreator   : %s\nsignature : %s\n%s", b.VerifySignature(), b.Publisher, b.signature, b.Content)
 }
 
 func (b Board) VerifySignature() bool {
+	if len(b.Publisher.PublicKey) == 0 || b.signature == nil {
+		return false
+	}
 	return ed25519.Verify(b.Publisher.PublicKey, b.Content, b.signature)
 }
 
@@ -198,6 +202,34 @@ func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 
 	// all checks pass, good board
 	return board, nil
+}
+
+func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error) {
+	// Authorization
+	sig, err := parseAuthorizationHeader(auth)
+	if err != nil {
+		return Board{}, err
+	}
+	// Content
+	content, err := io.ReadAll(body)
+	if err != nil {
+		return Board{}, err
+	}
+	return NewBoard(key, sig, content)
+}
+
+func parseAuthorizationHeader(auth string) (Signature, error) {
+	//Authorization: Spring-83 Signature=<signature>
+	reSig := regexp.MustCompile(`^Spring-83 Signature=([0-9A-Fa-f]{128}?)$`)
+	submatch := reSig.FindStringSubmatch(auth)
+	if submatch == nil || len(submatch) != 2 {
+		return []byte{}, errors.New("Failed to match 'Spring-83 Signature' auth")
+	}
+	sig, err := hex.DecodeString(submatch[1])
+	if err != nil {
+		return []byte{}, err
+	}
+	return sig, nil
 }
 
 // parse timestamp from HTML meta tag

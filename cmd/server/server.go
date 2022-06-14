@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"time"
@@ -72,7 +70,44 @@ func handleDifficulty(w http.ResponseWriter, req *http.Request) {
 }
 
 func handleGetBoard(w http.ResponseWriter, req *http.Request, key string) {
-	fmt.Fprintf(w, "TODO: GET board: %s\n", key)
+	var board s83.Board
+
+	// special case
+	// "an ever-changing board...with a timestamp set to the time of the request."
+	// TODO: clarify if this is the time as received, or the time per some header
+	if key == s83.TestPublic {
+
+		// TODO: create once per server and store in a context
+		creator, err := s83.NewCreatorFromKey(s83.TestPrivate)
+		if err != nil {
+			http.Error(w, "500 - Failed generating creator", http.StatusInternalServerError)
+			return
+		}
+
+		// create an interesting board
+		rand.Seed(time.Now().Unix())
+		randMsg := magic8Ball[rand.Intn(len(magic8Ball))]
+		content := fmt.Sprintf(testBoard, randMsg)
+
+		board, err = creator.NewBoard([]byte(content))
+		if err != nil {
+			http.Error(w, "500 - Failed generating board", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// TODO: load board from persistent store
+		http.Error(w, "501 - Not Implemented", http.StatusNotImplemented)
+		return
+	}
+
+	// TODO: other checks of validity (e.g. lazy TTL expiration)
+	if !board.VerifySignature() {
+		http.Error(w, "500 - Bad board", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Authorization", fmt.Sprintf("Spring-83 Signature=%s", board.Signature()))
+	fmt.Fprintf(w, string(board.Content))
 }
 
 func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
@@ -85,26 +120,15 @@ func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 		return
 	}
 
-	// Authorization
-	sig, err := parseAuthorization(req)
-	if err != nil {
-		http.Error(w, "401 - Invalid Authorization Header", http.StatusUnauthorized)
-		return
-	}
-
-	body, err := io.ReadAll(req.Body)
-	if err != nil {
-		http.Error(w, "500 - Failed reading request", http.StatusInternalServerError)
-		return
-	}
+	// TODO: blocklist
 
 	// Validate Board (size, signature, timestamp)
-	board, err := s83.NewBoard(key, sig, body)
+	board, err := s83.NewBoardFromHTTP(key, req.Header.Get("Authorization"), req.Body)
 	if err != nil {
 		// TODO: handle 400/401/409/513
 		// 400: Board was submitted with impromper meta timestamp tags.
 		// 401: Board was submitted without a valid signature.
-		// 513: Board is larger than 2217 bytes.
+		// 413: Board is larger than 2217 bytes.
 		http.Error(w, "400 - Bad Board", http.StatusBadRequest)
 		return
 	}
@@ -116,31 +140,15 @@ func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 	fmt.Fprintf(w, "TODO: PUT board: %s\n", key)
 	fmt.Fprintf(w, "%s\n", board)
 
-}
+	// TODO: gossip
 
-func parseAuthorization(req *http.Request) (s83.Signature, error) {
-	//Authorization: Spring-83 Signature=<signature>
-	auth := req.Header.Get("Authorization")
-	reSig := regexp.MustCompile(`^Spring-83 Signature=([0-9A-Fa-f]{128}?)$`)
-	submatch := reSig.FindStringSubmatch(auth)
-	if submatch == nil || len(submatch) != 2 {
-		return []byte{}, errors.New("Failed to match 'Spring-83 Signature' auth")
-	}
-	sig, err := hex.DecodeString(submatch[1])
-	if err != nil {
-		return []byte{}, err
-	}
-	return sig, nil
 }
 
 func main() {
-	/*
-		GET /<key>
-		PUT /<key>
-		GET /
-	*/
+
 	http.HandleFunc("/", handler)
 
+	// TODO: configure from ENV/file
 	host := ""
 	port := 8080
 	addr := fmt.Sprintf("%s:%d", host, port)
@@ -150,12 +158,48 @@ func main() {
 
 const greet = `<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>s83d</title>
-  </head>
-  <body>
-    <h1>&lt;arbitrary HTML greeting&gt;></h1>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <title>s83d</title>
+</head>
+<body>
+ <h1>&lt;arbitrary HTML greeting&gt;></h1>
+</body>
 </html>
 `
+
+const testBoard = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>s83d | Hello World</title>
+</head>
+<body>
+  <h1>Magic s83-ball</h1>
+  <p>%s</p>
+</body>
+</html>
+`
+
+var magic8Ball = []string{
+	"It is certain.",
+	"It is decidedly so.",
+	"Without a doubt.",
+	"Yes definitely.",
+	"You may rely on it.",
+	"As I see it, yes.",
+	"Most likely.",
+	"Outlook good.",
+	"Yes.",
+	"Signs point to yes.",
+	"Reply hazy, try again.",
+	"Ask again later.",
+	"Better not tell you now.",
+	"Cannot predict now.",
+	"Concentrate and ask again.",
+	"Don't count on it.",
+	"My reply is no.",
+	"My sources say no.",
+	"Outlook not so good.",
+	"Very doubtful. ",
+}
