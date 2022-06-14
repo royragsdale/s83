@@ -14,6 +14,9 @@ import (
 )
 
 func handler(w http.ResponseWriter, req *http.Request) {
+	// Log requests (TODO: configurable verbosity)
+	log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
+
 	// Common headers
 	w.Header().Set("Spring-Version", s83.SpringVersion)
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
@@ -76,16 +79,15 @@ func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
 	// fast fail
 	// "client must include the publishing timestamp in the If-Unmodified-Since header"
-	modSinceHead, err := http.ParseTime(req.Header.Get("If-Modified-Since"))
+	modSinceHead, err := http.ParseTime(req.Header.Get("If-Unmodified-Since"))
 	if err != nil || modSinceHead.After(time.Now()) {
-		http.Error(w, "400 - Invalid If-Modified-Since", http.StatusBadRequest)
+		http.Error(w, "400 - Invalid If-Unmodified-Since", http.StatusBadRequest)
 		return
 	}
 
 	// Authorization
 	sig, err := parseAuthorization(req)
 	if err != nil {
-		log.Println(err, req.Header.Get("Authorization"))
 		http.Error(w, "401 - Invalid Authorization Header", http.StatusUnauthorized)
 		return
 	}
@@ -93,6 +95,7 @@ func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(w, "500 - Failed reading request", http.StatusInternalServerError)
+		return
 	}
 
 	// Validate Board (size, signature, timestamp)
@@ -103,6 +106,7 @@ func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 		// 401: Board was submitted without a valid signature.
 		// 513: Board is larger than 2217 bytes.
 		http.Error(w, "400 - Bad Board", http.StatusBadRequest)
+		return
 	}
 
 	// TODO: load previous board from store
