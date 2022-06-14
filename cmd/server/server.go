@@ -11,7 +11,11 @@ import (
 	"github.com/royragsdale/s83"
 )
 
-func handler(w http.ResponseWriter, req *http.Request) {
+type Server struct {
+	store *Store
+}
+
+func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	// Log requests (TODO: configurable verbosity)
 	log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 
@@ -31,7 +35,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, "405 - Method Not Allowed: use GET", http.StatusMethodNotAllowed)
 			return
 		}
-		handleDifficulty(w, req)
+		srv.handleDifficulty(w, req)
 		return
 	}
 
@@ -42,10 +46,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		key := submatch[1]
 
 		if req.Method == http.MethodGet {
-			handleGetBoard(w, req, key)
+			srv.handleGetBoard(w, req, key)
 			return
 		} else if req.Method == http.MethodPut {
-			handlePutBoard(w, req, key)
+			srv.handlePutBoard(w, req, key)
 			return
 		} else {
 			http.Error(w, "405 - Method Not Allowed: use GET/PUT", http.StatusMethodNotAllowed)
@@ -57,11 +61,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	http.Error(w, "400 - Bad Request", http.StatusBadRequest)
 }
 
-func handleDifficulty(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) handleDifficulty(w http.ResponseWriter, req *http.Request) {
 
-	// TODO: load numBoards
-	numBoards := 8_500_000
-	difficultyFactor := s83.DifficultyFactor(numBoards)
+	//numBoards := 8_500_000
+	difficultyFactor := s83.DifficultyFactor(srv.store.NumBoards)
 	w.Header().Set("Spring-Difficulty", fmt.Sprintf("%f", difficultyFactor))
 
 	// TODO: insert stats/difficulty factor
@@ -69,8 +72,9 @@ func handleDifficulty(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func handleGetBoard(w http.ResponseWriter, req *http.Request, key string) {
+func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key string) {
 	var board s83.Board
+	var err error
 
 	// special case
 	// "an ever-changing board...with a timestamp set to the time of the request."
@@ -95,9 +99,13 @@ func handleGetBoard(w http.ResponseWriter, req *http.Request, key string) {
 			return
 		}
 	} else {
-		// TODO: load board from persistent store
-		http.Error(w, "501 - Not Implemented", http.StatusNotImplemented)
-		return
+		board, err = srv.store.boardFromKey(key)
+		if err != nil {
+			// TODO: other errors (internal like)
+			log.Println(err)
+			http.Error(w, "404 - Board not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	// TODO: other checks of validity (e.g. lazy TTL expiration)
@@ -106,11 +114,13 @@ func handleGetBoard(w http.ResponseWriter, req *http.Request, key string) {
 		return
 	}
 
+	// TODO: check/compare mod time
+
 	w.Header().Set("Authorization", fmt.Sprintf("Spring-83 Signature=%s", board.Signature()))
 	fmt.Fprintf(w, string(board.Content))
 }
 
-func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
+func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
 	// fast fail
 	// "client must include the publishing timestamp in the If-Unmodified-Since header"
@@ -145,12 +155,21 @@ func handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 }
 
 func main() {
-
-	http.HandleFunc("/", handler)
-
 	// TODO: configure from ENV/file
 	host := ""
 	port := 8080
+	storePath := "bin/store"
+
+	store, err := loadStore(storePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Path)
+
+	srv := &Server{store}
+
+	http.HandleFunc("/", srv.handler)
+
 	addr := fmt.Sprintf("%s:%d", host, port)
 	log.Printf("server started on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))

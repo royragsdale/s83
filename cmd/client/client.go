@@ -180,6 +180,10 @@ func Get(server *url.URL, key string) {
 	res, err := client.Do(req)
 	exitOnError(err)
 
+	if res.StatusCode != http.StatusOK {
+		exitOnError(errors.New(res.Status))
+	}
+
 	board, err := s83.NewBoardFromHTTP(key, res.Header.Get("Authorization"), res.Body)
 	exitOnError(err)
 
