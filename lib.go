@@ -77,8 +77,13 @@ func (c Creator) ExportPrivateKey() string {
 	return hex.EncodeToString(c.PrivateKey)[:64]
 }
 
+func (c Creator) Valid() bool {
+	return c.Publisher.valid()
+}
+
 func (c Creator) NewBoard(content []byte) (Board, error) {
 
+	// TODO: check board doesn't already have a timestamp
 	// prepend timestamp tag
 	timestamp := time.Now().UTC()
 	httpTime := timestamp.Format(http.TimeFormat)
@@ -145,11 +150,19 @@ type Board struct {
 }
 
 func (b Board) String() string {
-	return fmt.Sprintf("%s sends:\n%s\nsig verifies: %t\nsig: %s", b.Publisher, b.Content, b.VerifySignature(), hex.EncodeToString(b.signature))
+	return fmt.Sprintf("creator: %s\nsignature: %s\nverifies: %t\n%s", b.Publisher, b.signature, b.VerifySignature(), b.Content)
 }
 
 func (b Board) VerifySignature() bool {
 	return ed25519.Verify(b.Publisher.PublicKey, b.Content, b.signature)
+}
+
+func (b Board) Timestamp() string {
+	return b.timestamp.Format(http.TimeFormat)
+}
+
+func (b Board) Signature() string {
+	return b.signature.String()
 }
 
 func NewBoard(key string, sig Signature, content []byte) (Board, error) {
@@ -191,7 +204,7 @@ func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 func ParseTimestamp(content []byte) (time.Time, error) {
 
 	// TODO
-	return time.Now(), nil
+	return time.Now().UTC(), nil
 }
 
 // TODO: level of precision for difficulty factor?

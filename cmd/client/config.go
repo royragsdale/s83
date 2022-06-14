@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,7 +20,7 @@ server =`
 
 type Config struct {
 	Creator s83.Creator
-	Server  string
+	Server  *url.URL
 }
 
 func configDir() string {
@@ -30,9 +31,13 @@ func configDir() string {
 	return filepath.Join(configRoot, "s83")
 }
 
+func configPath() string {
+	return filepath.Join(configDir(), configName)
+}
+
 func initConfig() []byte {
 	configDir := configDir()
-	configPath := filepath.Join(configDir, configName)
+	configPath := configPath()
 
 	err := os.MkdirAll(configDir, 0700)
 	if err != nil {
@@ -62,7 +67,6 @@ func initConfig() []byte {
 	if err != nil {
 		log.Fatalf("Error reading initial config: %v", err)
 	}
-	defer config.Close()
 
 	return data
 }
@@ -70,13 +74,20 @@ func initConfig() []byte {
 func parseConfig(data []byte) Config {
 	config := Config{}
 
-	// match configuration keys (PrivateKey=, Server=)
-	rePrivateKey := regexp.MustCompile(`secret\s*=\s*([0-9A-Fa-f]{64}?)\n`)
-	reServer := regexp.MustCompile(`server\s*=\s*(.*)\n`)
+	// match configuration keys (secert=, server=)
+	rePrivateKey := regexp.MustCompile(`(?m)^secret\s*=\s*([0-9A-Fa-f]{64}?)$`)
+	reServer := regexp.MustCompile(`(?m)^server\s*=\s*(.*)$`)
 
 	serverMatch := reServer.FindSubmatch(data)
 	if serverMatch != nil && len(serverMatch) == 2 {
-		config.Server = string(serverMatch[1])
+		url, err := url.Parse(string(serverMatch[1]))
+		if err != nil {
+			fmt.Printf("[warn] Invalid server configuration: %v\n", err)
+		} else if url.Scheme != "http" && url.Scheme != "https" {
+			fmt.Printf("[warn] Invalid server configuration: must include `http` or `https` (%s)\n", url)
+		} else {
+			config.Server = url
+		}
 	}
 
 	privateKeyHexMatch := rePrivateKey.FindSubmatch(data)
@@ -84,15 +95,16 @@ func parseConfig(data []byte) Config {
 		pkHex := string(privateKeyHexMatch[1])
 		creator, err := s83.NewCreatorFromKey(pkHex)
 		if err != nil {
-			fmt.Printf("[warn] Invalid PrivateKey configuration: %v\n", err)
+			fmt.Printf("[warn] Invalid secret configuration: %v\n", err)
+		} else {
+			config.Creator = creator
 		}
-		config.Creator = creator
 	}
 	return config
 }
 
 func loadConfig() Config {
-	configPath := filepath.Join(configDir(), configName)
+	configPath := configPath()
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("[info] Config did not exist. Initializing a config at %s\n", configPath)
