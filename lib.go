@@ -87,13 +87,21 @@ func (c Creator) Valid() bool {
 
 func (c Creator) NewBoard(content []byte) (Board, error) {
 
-	// TODO: check board doesn't already have a timestamp
-	// prepend timestamp tag
-	timestamp := time.Now().UTC()
-	httpTime := timestamp.Format(http.TimeFormat)
-	lastModMeta := `<meta http-equiv="last-modified" content="%s">`
-	lastMod := []byte(fmt.Sprintf(lastModMeta, httpTime))
-	content = append(lastMod, content...)
+	// check board doesn't already have a timestamp
+	ts, err := ParseTimestamp(content)
+	if err != nil {
+		// TODO: consider other error cases (e.g. unparsable/multiple)
+		// no good timestamp, so helpfully prepend one
+		httpTime := time.Now().UTC().Format(http.TimeFormat)
+		lastModMeta := `<meta http-equiv="last-modified" content="%s">`
+		lastMod := []byte(fmt.Sprintf(lastModMeta, httpTime))
+		content = append(lastMod, content...)
+	} else if ts.After(time.Now().UTC()) {
+		// check the timestamp provided is not in the future
+		return Board{}, errors.New("last-modified timestamp is in the future")
+	}
+
+	// timestamp is good.
 
 	// create signature
 	sig := ed25519.Sign(c.PrivateKey, content)
@@ -260,6 +268,7 @@ tokLoop:
 		// meta tags are "start tokens"
 		case tokType == html.StartTagToken:
 			tok := z.Token()
+			// TODO: case insensitivity?
 			if tok.Data == "meta" && len(tok.Attr) == 2 {
 				a := tok.Attr[0]
 				b := tok.Attr[1]
