@@ -80,10 +80,11 @@ func parseConfig(data []byte) Config {
 
 	serverMatch := reServer.FindSubmatch(data)
 	if serverMatch != nil && len(serverMatch) == 2 {
-		url, err := url.Parse(string(serverMatch[1]))
+		serverStr := string(serverMatch[1])
+		url, err := url.Parse(serverStr)
 		if err != nil {
 			fmt.Printf("[warn] Invalid server configuration: %v\n", err)
-		} else if url.Scheme != "http" && url.Scheme != "https" {
+		} else if url.Scheme != "http" && url.Scheme != "https" && serverStr != "" {
 			fmt.Printf("[warn] Invalid server configuration: must include `http` or `https` (%s)\n", url)
 		} else {
 			config.Server = url

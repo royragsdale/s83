@@ -171,7 +171,7 @@ func main() {
 	// TODO: configure from ENV/file
 	host := ""
 	port := 8080
-	storePath := "bin/store"
+	storePath := "store"
 
 	store, err := loadStore(storePath)
 	if err != nil {
