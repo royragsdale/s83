@@ -3,9 +3,10 @@
 A sample [Spring '83](https://www.robinsloan.com/lab/specifying-spring-83/)
 client and server implementation according to the draft
 [spec](https://github.com/robinsloan/spring-83-spec/blob/main/draft-20220609.md)
-in response to Robin’s Request For Friendly Critique and Comment (RRFFCC).
+in response to Robin’s Request For Friendly Critique and Comment (RRFFCC) and
+for fun.
 
-**This is fun. This will change**
+**"It is DEFINITELY going to change."**
 
 ## Quick Start/Demo
 
