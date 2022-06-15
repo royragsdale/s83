@@ -102,7 +102,6 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 		board, err = srv.store.boardFromKey(key)
 		if err != nil {
 			// TODO: other errors (internal like)
-			log.Println(err)
 			http.Error(w, "404 - Board not found", http.StatusNotFound)
 			return
 		}
@@ -143,15 +142,27 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 		return
 	}
 
-	// TODO: load previous board from store
-	// 403: Board was submitted for a key that does not meet the difficulty factor.
-	// 404: No board for this key found on this server.
-	// 409: Board was submitted with a timestamp older than the server's timestamp for this key.
-	fmt.Fprintf(w, "TODO: PUT board: %s\n", key)
-	fmt.Fprintf(w, "%s\n", board)
+	existingBoard, err := srv.store.boardFromKey(key)
+	// there was a valid existing board
+	if err == nil {
+		if !board.After(existingBoard) {
+			fmt.Println(board.Timestamp())
+			fmt.Println(existingBoard.Timestamp())
+			http.Error(w, "409 - Submission older than existing board", http.StatusConflict)
+			return
+		}
+	} else {
+		// TODO: check difficulty factor
+		// 403: Board was submitted for a key that does not meet the difficulty factor.
+	}
 
-	// TODO: gossip
+	err = srv.store.saveBoard(board)
+	if err != nil {
+		fmt.Println("error saving board", err)
+		http.Error(w, "500 - Internal Server Error", http.StatusInternalServerError)
+	}
 
+	// TODO: queue board up for gossip
 }
 
 func main() {

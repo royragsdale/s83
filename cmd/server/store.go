@@ -90,6 +90,12 @@ func (s *Store) boardFromPath(path string) (s83.Board, error) {
 	return s83.NewBoard(pathToKey(path), sig, content)
 }
 
+func (s *Store) saveBoard(board s83.Board) error {
+	path := s.keyToPath(board.Publisher.String())
+	data := append([]byte(board.Signature()+"\n"), board.Content...)
+	return os.WriteFile(path, data, 0600)
+}
+
 func (s *Store) keyToPath(key string) string {
 	return filepath.Join(s.Path, fmt.Sprintf("%s.s83", key))
 }

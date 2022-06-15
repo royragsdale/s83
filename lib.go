@@ -1,6 +1,7 @@
 package s83
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
@@ -13,6 +14,8 @@ import (
 	"strconv"
 	"time"
 	"unicode/utf8"
+
+	"golang.org/x/net/html"
 )
 
 // SpringVersion for use in http headers
@@ -169,6 +172,10 @@ func (b Board) Signature() string {
 	return b.signature.String()
 }
 
+func (b Board) After(other Board) bool {
+	return b.timestamp.After(other.timestamp)
+}
+
 func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 	board := Board{}
 	publisher, err := NewPublisherFromKey(key)
@@ -233,10 +240,60 @@ func parseAuthorizationHeader(auth string) (Signature, error) {
 }
 
 // parse timestamp from HTML meta tag
+// <meta http-equiv="last-modified" content="<date and time in HTTP format>">
 func ParseTimestamp(content []byte) (time.Time, error) {
+	ts := time.Time{}
 
-	// TODO
-	return time.Now().UTC(), nil
+	z := html.NewTokenizer(bytes.NewReader(content))
+tokLoop:
+	for {
+		switch tokType := z.Next(); {
+
+		// reached the end
+		case tokType == html.ErrorToken && z.Err() == io.EOF:
+			break tokLoop
+
+		// unexpected error parsing (boards should be parsable)
+		case tokType == html.ErrorToken:
+			return time.Time{}, z.Err()
+
+		// meta tags are "start tokens"
+		case tokType == html.StartTagToken:
+			tok := z.Token()
+			if tok.Data == "meta" && len(tok.Attr) == 2 {
+				a := tok.Attr[0]
+				b := tok.Attr[1]
+				tStr := ""
+				if a.Key == "http-equiv" && a.Val == "last-modified" && b.Key == "content" {
+					tStr = b.Val
+				} else if b.Key == "http-equiv" && b.Val == "last-modified" && a.Key == "content" {
+					tStr = a.Val
+				} else {
+					// some other meta tag
+					break
+				}
+
+				// check if we have already found a good last-modified meta tag
+				if !ts.IsZero() {
+					return time.Time{}, errors.New("Multiple last-modified meta tags")
+				}
+
+				t, err := http.ParseTime(tStr)
+				if err != nil {
+					return time.Time{}, errors.New("Unparsable last-modified meta tag")
+				}
+				// got a good timestamp
+				ts = t
+			}
+		}
+	}
+
+	// got to the end of the board without finding a last-modified meta tag
+	if ts.IsZero() {
+		return ts, errors.New("Unable to find a last-modified meta tag")
+	} else {
+		return ts, nil
+	}
 }
 
 // TODO: level of precision for difficulty factor?
