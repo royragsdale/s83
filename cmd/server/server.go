@@ -160,6 +160,8 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	if err != nil {
 		fmt.Println("error saving board", err)
 		http.Error(w, "500 - Internal Server Error", http.StatusInternalServerError)
+	} else {
+		srv.store.NumBoards += 1
 	}
 
 	// TODO: queue board up for gossip
