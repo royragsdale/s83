@@ -28,8 +28,10 @@ const maxNumBoards = 10_000_000
 
 const maxBoardLen = 2217
 
-const TestPublic = "fad415fbaa0339c4fd372d8287e50f67905321ccfd9c43fa4c20ac40afed1983"
-const TestPrivate = "a7e4d1c8be858d683ab9cb15574bd0bc3a87e6c846cdaf848da498909cb574f7"
+const yearBase = 2000 // update in year 3000
+
+const TestPublic = "ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583"
+const TestPrivate = "3371f8b011f51632fea33ed0a3688c26a45498205c6097c352bd4d079d224419"
 
 type Creator struct {
 	PrivateKey ed25519.PrivateKey
@@ -130,22 +132,32 @@ func (p Publisher) String() string {
 // TODO: add difficulty check
 func (p Publisher) valid() bool {
 	// ensures a key conforms to the correct format
-	// ends in ed20XX where X are digits and "must fall in the range 2022 .. 2099"
-	reValidKey := regexp.MustCompile(`ed20[2-9][0-9]$`)
+	// final seven hex characters must be 83e followed by four characters, interpreted as MMYY
+	reValidKey := regexp.MustCompile(`83e(0[1-9]|1[0-2])(\d\d)$`)
 	if !reValidKey.MatchString(p.String()) {
 		return false
 	}
 
-	// "Keys are only valid in two calendar years:
-	//		the year specified in their final four digits,
-	//		and the year previous."
-	keyYear, err := strconv.Atoi(p.String()[len(p.String())-4:])
+	// the key is only valid in the two years preceding it,
+	// and expires at the end of the last day of the month specified
+	yearStr := p.String()[keyLen-2:]
+	keyYear, err := strconv.Atoi(yearStr)
 	if err != nil {
 		return false
 	}
-	curYear := time.Now().Year()
 
-	return (curYear-1 <= keyYear) && (keyYear <= curYear)
+	monthStr := p.String()[keyLen-4 : keyLen-2]
+	keyMonth, err := strconv.Atoi(monthStr)
+	if err != nil {
+		return false
+	}
+
+	keyDate := time.Date(yearBase+keyYear, time.Month(keyMonth), 0, 0, 0, 0, 0, time.UTC)
+	keyExpiry := keyDate.AddDate(0, 1, 0) // valid for the entire month of expiration
+	keyStart := keyDate.AddDate(-2, 0, 0) // valid for two years preceding
+	now := time.Now().UTC()
+
+	return keyStart.Before(now) && keyExpiry.After(now)
 }
 
 type Signature []byte
