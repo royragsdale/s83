@@ -1,6 +1,8 @@
 package s83
 
 import (
+	"encoding/hex"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -9,6 +11,7 @@ import (
 )
 
 func TestGenCreator(t *testing.T) {
+	// fast: not necessarily a valid creator
 	creator, err := genCreator()
 	if err != nil || creator.PrivateKey == nil || creator.PublicKey == nil {
 		t.Fatalf(`Failure making creator: %v %v`, creator, err)
@@ -26,9 +29,30 @@ func TestLoadingFromTestKeys(t *testing.T) {
 		t.Fatalf(`Error loading creator from key: %v`, err)
 	}
 
+	if testCreator.Valid() {
+		t.Fatalf("Test creator should not be valid (expired)")
+	}
+
 	if !testCreator.PublicKey.Equal(testPublisher.PublicKey) {
 		t.Fatalf(`Error matching creator/publisher that share a key: %s %s`, testCreator, testPublisher)
 	}
+
+	_, err = NewCreatorFromKey("a")
+	if err == nil {
+		t.Errorf("NewCreatorFromKey should error on a short key")
+	}
+
+	_, err = NewCreatorFromKey("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+	if err == nil {
+		t.Errorf("NewCreatorFromKey should error on a a non-hex key")
+	}
+
+}
+
+func dateToKey(t time.Time) string {
+	stub := strings.Repeat("a", keyLen-7) // must be hex char
+	prefix := "83e"                       // valid prefix
+	return fmt.Sprintf("%s%s%02d%s", stub, prefix, int(t.Month()), strconv.Itoa(t.Year())[2:])
 }
 
 func TestKeyValidity(t *testing.T) {
@@ -43,42 +67,41 @@ func TestKeyValidity(t *testing.T) {
 		t.Fatalf(`Test key should not be valid (1983): %v`, testPublisher)
 	}
 
-	// supporting strings
-	stub58 := strings.Repeat("a", 58) // must be hex char
-	prefix := stub58 + "ed"           // valid prefix
-	year := time.Now().Year()
+	cur := time.Now().UTC()
 
 	// valid
-	curYear := prefix + strconv.Itoa(year)
-	prevYear := prefix + strconv.Itoa(year-1)
+	yr1 := dateToKey(cur.AddDate(1, 0, 0))
+	yr2 := dateToKey(cur.AddDate(2, 0, 0))
 
 	// invalid
-	badPrefix := stub58 + "bb" + strconv.Itoa(year) // prefix must be ed
-	nextYear := prefix + strconv.Itoa(year+1)       // future years are invalid
+	badPrefix := strings.Repeat("a", keyLen-4) + yr1[keyLen-4:]
+	prevM := dateToKey(cur.AddDate(0, -1, 0)) // expired
+	yr2m1 := dateToKey(cur.AddDate(2, 1, 0))  // not yet valid
 
 	// bad keys (should error on load)
 	short := "a"
 	nonHex := strings.Repeat("X", 64) // must be hex char
 
 	type keyTest struct {
+		name        string
 		key         string
 		valid       bool
 		errExpected bool
 	}
 	var keyTests = []keyTest{
-		{curYear, true, false}, {prevYear, true, false},
-		{badPrefix, false, false}, {nextYear, false, false},
-		{short, false, true}, {nonHex, false, true},
+		{"cur", dateToKey(cur), true, false}, {"yr 1", yr1, true, false}, {"yr 2", yr2, true, false},
+		{"bad prefix", badPrefix, false, false}, {"next2", prevM, false, false}, {"next2", yr2m1, false, false},
+		{"short", short, false, true}, {"non hex", nonHex, false, true},
 	}
 
 	for _, tt := range keyTests {
 		p, err := NewPublisherFromKey(tt.key)
 		if err != nil && !tt.errExpected {
-			t.Errorf(`Unexpected error loading publisher from key: %v`, err)
+			t.Errorf(`Unexpected error loading publisher from key: %s: %v`, tt.name, err)
 		}
 		actual := p.valid()
 		if actual != tt.valid {
-			t.Errorf("Wrong key validity (%s): expected %t, actual %t", tt.key, tt.valid, actual)
+			t.Errorf("Wrong key validity (%s : %s): expected %t, actual %t", tt.name, tt.key, tt.valid, actual)
 		}
 	}
 
@@ -100,10 +123,36 @@ func TestBoardCreation(t *testing.T) {
 		t.Errorf("Board failed signature verification")
 	}
 
+	if len(board.Signature()) != sigLen {
+		t.Errorf("Signature should be %d long", keyLen)
+	}
+
 	// force invalid signature
 	board.signature = []byte("xxx")
 	if board.VerifySignature() {
 		t.Errorf("Board with bad signature should fail")
+	}
+
+	now := time.Now().UTC()
+	second := now.AddDate(-1, 0, 0)
+
+	multipleTS := fmt.Sprintf(`%s%s`, timeElem(now), timeElem(second))
+
+	board, err = creator.NewBoard([]byte(multipleTS))
+	if err != nil {
+		t.Errorf("Board with multiple timestamps is valid should take first seen")
+	}
+
+	// compare strings so that it strips the fractional seconds
+	if board.timestamp.Format(TimeFormat8601) != now.Format(TimeFormat8601) {
+		t.Errorf("Board with multiple timestamps is valid should take first seen")
+		fmt.Println(board.timestamp, now)
+	}
+
+	future := now.AddDate(0, 0, 1)
+	board, err = creator.NewBoard([]byte(timeElem(future)))
+	if err == nil {
+		t.Errorf("Board with future timestamps should fail")
 	}
 
 }
@@ -148,6 +197,30 @@ func TestDifficultyFactor(t *testing.T) {
 		if threshold.Cmp(tt.threshold) != 0 {
 			t.Errorf("Wrong key threshold: expected %d, actual %d", tt.threshold, threshold)
 		}
-
 	}
 }
+
+func TestStringFormats(t *testing.T) {
+	creator, err := genCreator()
+	if err != nil || creator.PrivateKey == nil || creator.PublicKey == nil {
+		t.Fatalf(`Failure making creator: %v %v`, creator, err)
+	}
+
+	keys := []string{creator.String(), creator.ExportPrivateKey(), creator.Publisher.String()}
+	for _, key := range keys {
+		if len(key) != keyLen {
+			t.Errorf("Creator should be %d long", keyLen)
+		}
+
+		_, err = hex.DecodeString(key)
+		if err != nil {
+			t.Errorf("Keys should be hex encoded")
+		}
+	}
+}
+
+// TODO: test strings
+// TODO: test NewBoard edge cases
+// TODO: NewBoardFromHTTP
+// TODO: parseSignatureHeader
+// TODO: test ParseTimestamp directly for edge cases (including capitalization)

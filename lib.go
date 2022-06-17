@@ -28,8 +28,12 @@ const maxNumBoards = 10_000_000
 
 const maxBoardLen = 2217
 
-const TestPublic = "fad415fbaa0339c4fd372d8287e50f67905321ccfd9c43fa4c20ac40afed1983"
-const TestPrivate = "a7e4d1c8be858d683ab9cb15574bd0bc3a87e6c846cdaf848da498909cb574f7"
+const yearBase = 2000 // update in year 3000
+
+const TestPublic = "ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583"
+const TestPrivate = "3371f8b011f51632fea33ed0a3688c26a45498205c6097c352bd4d079d224419"
+
+const TimeFormat8601 = "2006-01-02T15:04:05Z" //"YYYY-MM-DDTHH:MM:SSZ"
 
 type Creator struct {
 	PrivateKey ed25519.PrivateKey
@@ -85,6 +89,11 @@ func (c Creator) Valid() bool {
 	return c.Publisher.valid()
 }
 
+func timeElem(t time.Time) string {
+	tStr := t.UTC().Format(TimeFormat8601)
+	return fmt.Sprintf(`<time datetime="%s">`, tStr)
+}
+
 func (c Creator) NewBoard(content []byte) (Board, error) {
 
 	// check board doesn't already have a timestamp
@@ -92,13 +101,11 @@ func (c Creator) NewBoard(content []byte) (Board, error) {
 	if err != nil {
 		// TODO: consider other error cases (e.g. unparsable/multiple)
 		// no good timestamp, so helpfully prepend one
-		httpTime := time.Now().UTC().Format(http.TimeFormat)
-		lastModMeta := `<meta http-equiv="last-modified" content="%s">`
-		lastMod := []byte(fmt.Sprintf(lastModMeta, httpTime))
-		content = append(lastMod, content...)
+		tElem := []byte(timeElem(time.Now().UTC()))
+		content = append(tElem, content...)
 	} else if ts.After(time.Now().UTC()) {
 		// check the timestamp provided is not in the future
-		return Board{}, errors.New("last-modified timestamp is in the future")
+		return Board{}, errors.New("time element timestamp is in the future")
 	}
 
 	// timestamp is good.
@@ -130,22 +137,32 @@ func (p Publisher) String() string {
 // TODO: add difficulty check
 func (p Publisher) valid() bool {
 	// ensures a key conforms to the correct format
-	// ends in ed20XX where X are digits and "must fall in the range 2022 .. 2099"
-	reValidKey := regexp.MustCompile(`ed20[2-9][0-9]$`)
+	// final seven hex characters must be 83e followed by four characters, interpreted as MMYY
+	reValidKey := regexp.MustCompile(`83e(0[1-9]|1[0-2])(\d\d)$`)
 	if !reValidKey.MatchString(p.String()) {
 		return false
 	}
 
-	// "Keys are only valid in two calendar years:
-	//		the year specified in their final four digits,
-	//		and the year previous."
-	keyYear, err := strconv.Atoi(p.String()[len(p.String())-4:])
+	// the key is only valid in the two years preceding it,
+	// and expires at the end of the last day of the month specified
+	yearStr := p.String()[keyLen-2:]
+	keyYear, err := strconv.Atoi(yearStr)
 	if err != nil {
 		return false
 	}
-	curYear := time.Now().Year()
 
-	return (curYear-1 <= keyYear) && (keyYear <= curYear)
+	monthStr := p.String()[keyLen-4 : keyLen-2]
+	keyMonth, err := strconv.Atoi(monthStr)
+	if err != nil {
+		return false
+	}
+
+	keyDate := time.Date(yearBase+keyYear, time.Month(keyMonth), 0, 0, 0, 0, 0, time.UTC)
+	keyExpiry := keyDate.AddDate(0, 1, 0) // valid for the entire month of expiration
+	keyStart := keyDate.AddDate(-2, 0, 0) // valid for two years preceding
+	now := time.Now().UTC()
+
+	return keyStart.Before(now) && keyExpiry.After(now)
 }
 
 type Signature []byte
@@ -173,6 +190,7 @@ func (b Board) VerifySignature() bool {
 }
 
 func (b Board) Timestamp() string {
+	// TODO (?):  If-Unmodified-Since: <date and time in UTC, HTTP (RFC 5322) format>
 	return b.timestamp.Format(http.TimeFormat)
 }
 
@@ -220,8 +238,8 @@ func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 }
 
 func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error) {
-	// Authorization
-	sig, err := parseAuthorizationHeader(auth)
+	// Signature
+	sig, err := parseSignatureHeader(auth)
 	if err != nil {
 		return Board{}, err
 	}
@@ -233,76 +251,54 @@ func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error
 	return NewBoard(key, sig, content)
 }
 
-func parseAuthorizationHeader(auth string) (Signature, error) {
-	//Authorization: Spring-83 Signature=<signature>
-	reSig := regexp.MustCompile(`^Spring-83 Signature=([0-9A-Fa-f]{128}?)$`)
-	submatch := reSig.FindStringSubmatch(auth)
-	if submatch == nil || len(submatch) != 2 {
-		return []byte{}, errors.New("Failed to match 'Spring-83 Signature' auth")
+func parseSignatureHeader(auth string) (Signature, error) {
+	//Spring-Signature: <signature>
+	reSig := regexp.MustCompile(`^[0-9A-Fa-f]{128}$`)
+	match := reSig.FindString(auth)
+	if match == "" {
+		return []byte{}, errors.New("Invalid format for 'Spring-Signature'")
 	}
-	sig, err := hex.DecodeString(submatch[1])
+	sig, err := hex.DecodeString(match)
 	if err != nil {
 		return []byte{}, err
 	}
 	return sig, nil
 }
 
-// parse timestamp from HTML meta tag
-// <meta http-equiv="last-modified" content="<date and time in HTTP format>">
+// parse timestamp from HTML time element
+// <time datetime="YYYY-MM-DDTHH:MM:SSZ">
 func ParseTimestamp(content []byte) (time.Time, error) {
-	ts := time.Time{}
 
 	z := html.NewTokenizer(bytes.NewReader(content))
-tokLoop:
 	for {
 		switch tokType := z.Next(); {
 
 		// reached the end
 		case tokType == html.ErrorToken && z.Err() == io.EOF:
-			break tokLoop
+			return time.Time{}, errors.New("Unable to find a valid time element")
 
 		// unexpected error parsing (boards should be parsable)
 		case tokType == html.ErrorToken:
 			return time.Time{}, z.Err()
 
-		// meta tags are "start tokens"
+		// time elements are "start tokens"
 		case tokType == html.StartTagToken:
 			tok := z.Token()
-			// TODO: case insensitivity?
-			if tok.Data == "meta" && len(tok.Attr) == 2 {
-				a := tok.Attr[0]
-				b := tok.Attr[1]
-				tStr := ""
-				if a.Key == "http-equiv" && a.Val == "last-modified" && b.Key == "content" {
-					tStr = b.Val
-				} else if b.Key == "http-equiv" && b.Val == "last-modified" && a.Key == "content" {
-					tStr = a.Val
-				} else {
-					// some other meta tag
-					break
-				}
 
-				// check if we have already found a good last-modified meta tag
-				if !ts.IsZero() {
-					return time.Time{}, errors.New("Multiple last-modified meta tags")
-				}
-
-				t, err := http.ParseTime(tStr)
+			if tok.Data == "time" && len(tok.Attr) == 1 && tok.Attr[0].Key == "datetime" {
+				t, err := time.Parse(TimeFormat8601, tok.Attr[0].Val)
 				if err != nil {
-					return time.Time{}, errors.New("Unparsable last-modified meta tag")
+					// unparseable time tag (maybe there is another valid one)
+					continue
 				}
 				// got a good timestamp
-				ts = t
+				return t, nil
 			}
 		}
 	}
 
-	// got to the end of the board without finding a last-modified meta tag
-	if ts.IsZero() {
-		return ts, errors.New("Unable to find a last-modified meta tag")
-	} else {
-		return ts, nil
-	}
+	// should not reach here
+	return time.Time{}, errors.New("Unable to find a valid time element")
 }
 
 // TODO: level of precision for difficulty factor?

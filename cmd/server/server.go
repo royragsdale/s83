@@ -19,6 +19,12 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	// Log requests (TODO: configurable verbosity)
 	log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 
+	// Servers must support preflight OPTIONS requests to all endpoints
+	if req.Method == http.MethodOptions {
+		srv.handleOptions(w, req)
+		return
+	}
+
 	// Common headers
 	w.Header().Set("Spring-Version", s83.SpringVersion)
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
@@ -59,6 +65,14 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 
 	// fallthrough failcase
 	http.Error(w, "400 - Bad Request", http.StatusBadRequest)
+}
+
+func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Modified-Since, Spring-Signature, Spring-Version")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Last-Modified, Spring-Difficulty, Spring-Signature, Spring-Version")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (srv *Server) handleDifficulty(w http.ResponseWriter, req *http.Request) {
@@ -115,29 +129,22 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 	// TODO: check/compare mod time
 
-	w.Header().Set("Authorization", fmt.Sprintf("Spring-83 Signature=%s", board.Signature()))
+	w.Header().Set("Spring-Signature", board.Signature())
 	fmt.Fprintf(w, string(board.Content))
 }
 
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
-	// fast fail
-	// "client must include the publishing timestamp in the If-Unmodified-Since header"
-	modSinceHead, err := http.ParseTime(req.Header.Get("If-Unmodified-Since"))
-	if err != nil || modSinceHead.After(time.Now()) {
-		http.Error(w, "400 - Invalid If-Unmodified-Since", http.StatusBadRequest)
-		return
-	}
-
 	// TODO: blocklist
 
 	// Validate Board (size, signature, timestamp)
-	board, err := s83.NewBoardFromHTTP(key, req.Header.Get("Authorization"), req.Body)
+	board, err := s83.NewBoardFromHTTP(key, req.Header.Get("Spring-Signature"), req.Body)
 	if err != nil {
 		// TODO: handle 400/401/409/513
 		// 400: Board was submitted with impromper meta timestamp tags.
 		// 401: Board was submitted without a valid signature.
 		// 413: Board is larger than 2217 bytes.
+		log.Println(err)
 		http.Error(w, "400 - Bad Board", http.StatusBadRequest)
 		return
 	}
@@ -146,8 +153,6 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	// there was a valid existing board
 	if err == nil {
 		if !board.After(existingBoard) {
-			fmt.Println(board.Timestamp())
-			fmt.Println(existingBoard.Timestamp())
 			http.Error(w, "409 - Submission older than existing board", http.StatusConflict)
 			return
 		}
