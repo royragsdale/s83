@@ -133,15 +133,24 @@ func TestBoardCreation(t *testing.T) {
 		t.Errorf("Board with bad signature should fail")
 	}
 
-	multipleTS := `<meta http-equiv="last-modified" content="Wed, 15 Jun 2011 00:55:36 GMT">
-					<meta http-equiv="last-modified" content="Thu, 16 Jun 2011 00:55:36 GMT">`
+	now := time.Now().UTC()
+	second := now.AddDate(-1, 0, 0)
+
+	multipleTS := fmt.Sprintf(`%s%s`, timeElem(now), timeElem(second))
+
 	board, err = creator.NewBoard([]byte(multipleTS))
-	if err == nil {
-		t.Errorf("Board with multiple timestamps should fail")
+	if err != nil {
+		t.Errorf("Board with multiple timestamps is valid should take first seen")
 	}
 
-	futureTS := `<meta http-equiv="last-modified" content="Wed, 01 Jan 2983 00:00:00 GMT">`
-	board, err = creator.NewBoard([]byte(futureTS))
+	// compare strings so that it strips the fractional seconds
+	if board.timestamp.Format(TimeFormat8601) != now.Format(TimeFormat8601) {
+		t.Errorf("Board with multiple timestamps is valid should take first seen")
+		fmt.Println(board.timestamp, now)
+	}
+
+	future := now.AddDate(0, 0, 1)
+	board, err = creator.NewBoard([]byte(timeElem(future)))
 	if err == nil {
 		t.Errorf("Board with future timestamps should fail")
 	}

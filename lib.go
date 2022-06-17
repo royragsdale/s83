@@ -33,6 +33,8 @@ const yearBase = 2000 // update in year 3000
 const TestPublic = "ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583"
 const TestPrivate = "3371f8b011f51632fea33ed0a3688c26a45498205c6097c352bd4d079d224419"
 
+const TimeFormat8601 = "2006-01-02T15:04:05Z" //"YYYY-MM-DDTHH:MM:SSZ"
+
 type Creator struct {
 	PrivateKey ed25519.PrivateKey
 	Publisher
@@ -87,6 +89,11 @@ func (c Creator) Valid() bool {
 	return c.Publisher.valid()
 }
 
+func timeElem(t time.Time) string {
+	tStr := t.UTC().Format(TimeFormat8601)
+	return fmt.Sprintf(`<time datetime="%s">`, tStr)
+}
+
 func (c Creator) NewBoard(content []byte) (Board, error) {
 
 	// check board doesn't already have a timestamp
@@ -94,13 +101,11 @@ func (c Creator) NewBoard(content []byte) (Board, error) {
 	if err != nil {
 		// TODO: consider other error cases (e.g. unparsable/multiple)
 		// no good timestamp, so helpfully prepend one
-		httpTime := time.Now().UTC().Format(http.TimeFormat)
-		lastModMeta := `<meta http-equiv="last-modified" content="%s">`
-		lastMod := []byte(fmt.Sprintf(lastModMeta, httpTime))
-		content = append(lastMod, content...)
+		tElem := []byte(timeElem(time.Now().UTC()))
+		content = append(tElem, content...)
 	} else if ts.After(time.Now().UTC()) {
 		// check the timestamp provided is not in the future
-		return Board{}, errors.New("last-modified timestamp is in the future")
+		return Board{}, errors.New("time element timestamp is in the future")
 	}
 
 	// timestamp is good.
@@ -185,6 +190,7 @@ func (b Board) VerifySignature() bool {
 }
 
 func (b Board) Timestamp() string {
+	// TODO (?):  If-Unmodified-Since: <date and time in UTC, HTTP (RFC 5322) format>
 	return b.timestamp.Format(http.TimeFormat)
 }
 
@@ -259,62 +265,40 @@ func parseAuthorizationHeader(auth string) (Signature, error) {
 	return sig, nil
 }
 
-// parse timestamp from HTML meta tag
-// <meta http-equiv="last-modified" content="<date and time in HTTP format>">
+// parse timestamp from HTML time element
+// <time datetime="YYYY-MM-DDTHH:MM:SSZ">
 func ParseTimestamp(content []byte) (time.Time, error) {
-	ts := time.Time{}
 
 	z := html.NewTokenizer(bytes.NewReader(content))
-tokLoop:
 	for {
 		switch tokType := z.Next(); {
 
 		// reached the end
 		case tokType == html.ErrorToken && z.Err() == io.EOF:
-			break tokLoop
+			return time.Time{}, errors.New("Unable to find a valid time element")
 
 		// unexpected error parsing (boards should be parsable)
 		case tokType == html.ErrorToken:
 			return time.Time{}, z.Err()
 
-		// meta tags are "start tokens"
+		// time elements are "start tokens"
 		case tokType == html.StartTagToken:
 			tok := z.Token()
-			// TODO: case insensitivity?
-			if tok.Data == "meta" && len(tok.Attr) == 2 {
-				a := tok.Attr[0]
-				b := tok.Attr[1]
-				tStr := ""
-				if a.Key == "http-equiv" && a.Val == "last-modified" && b.Key == "content" {
-					tStr = b.Val
-				} else if b.Key == "http-equiv" && b.Val == "last-modified" && a.Key == "content" {
-					tStr = a.Val
-				} else {
-					// some other meta tag
-					break
-				}
 
-				// check if we have already found a good last-modified meta tag
-				if !ts.IsZero() {
-					return time.Time{}, errors.New("Multiple last-modified meta tags")
-				}
-
-				t, err := http.ParseTime(tStr)
+			if tok.Data == "time" && len(tok.Attr) == 1 && tok.Attr[0].Key == "datetime" {
+				t, err := time.Parse(TimeFormat8601, tok.Attr[0].Val)
 				if err != nil {
-					return time.Time{}, errors.New("Unparsable last-modified meta tag")
+					// unparseable time tag (maybe there is another valid one)
+					continue
 				}
 				// got a good timestamp
-				ts = t
+				return t, nil
 			}
 		}
 	}
 
-	// got to the end of the board without finding a last-modified meta tag
-	if ts.IsZero() {
-		return ts, errors.New("Unable to find a last-modified meta tag")
-	} else {
-		return ts, nil
-	}
+	// should not reach here
+	return time.Time{}, errors.New("Unable to find a valid time element")
 }
 
 // TODO: level of precision for difficulty factor?
