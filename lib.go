@@ -238,8 +238,8 @@ func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 }
 
 func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error) {
-	// Authorization
-	sig, err := parseAuthorizationHeader(auth)
+	// Signature
+	sig, err := parseSignatureHeader(auth)
 	if err != nil {
 		return Board{}, err
 	}
@@ -251,14 +251,14 @@ func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error
 	return NewBoard(key, sig, content)
 }
 
-func parseAuthorizationHeader(auth string) (Signature, error) {
-	//Authorization: Spring-83 Signature=<signature>
-	reSig := regexp.MustCompile(`^Spring-83 Signature=([0-9A-Fa-f]{128}?)$`)
-	submatch := reSig.FindStringSubmatch(auth)
-	if submatch == nil || len(submatch) != 2 {
-		return []byte{}, errors.New("Failed to match 'Spring-83 Signature' auth")
+func parseSignatureHeader(auth string) (Signature, error) {
+	//Spring-Signature: <signature>
+	reSig := regexp.MustCompile(`^[0-9A-Fa-f]{128}$`)
+	match := reSig.FindString(auth)
+	if match == "" {
+		return []byte{}, errors.New("Invalid format for 'Spring-Signature'")
 	}
-	sig, err := hex.DecodeString(submatch[1])
+	sig, err := hex.DecodeString(match)
 	if err != nil {
 		return []byte{}, err
 	}

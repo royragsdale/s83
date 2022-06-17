@@ -129,7 +129,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 	// TODO: check/compare mod time
 
-	w.Header().Set("Authorization", fmt.Sprintf("Spring-83 Signature=%s", board.Signature()))
+	w.Header().Set("Spring-Signature", board.Signature())
 	fmt.Fprintf(w, string(board.Content))
 }
 
@@ -138,12 +138,13 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	// TODO: blocklist
 
 	// Validate Board (size, signature, timestamp)
-	board, err := s83.NewBoardFromHTTP(key, req.Header.Get("Authorization"), req.Body)
+	board, err := s83.NewBoardFromHTTP(key, req.Header.Get("Spring-Signature"), req.Body)
 	if err != nil {
 		// TODO: handle 400/401/409/513
 		// 400: Board was submitted with impromper meta timestamp tags.
 		// 401: Board was submitted without a valid signature.
 		// 413: Board is larger than 2217 bytes.
+		log.Println(err)
 		http.Error(w, "400 - Bad Board", http.StatusBadRequest)
 		return
 	}

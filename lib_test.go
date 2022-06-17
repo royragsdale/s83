@@ -222,5 +222,5 @@ func TestStringFormats(t *testing.T) {
 // TODO: test strings
 // TODO: test NewBoard edge cases
 // TODO: NewBoardFromHTTP
-// TODO: parseAuthorizationHeader
+// TODO: parseSignatureHeader
 // TODO: test ParseTimestamp directly for edge cases (including capitalization)

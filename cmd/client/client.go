@@ -138,8 +138,9 @@ func publishBoard(server *url.URL, board s83.Board) error {
 	exitOnError(err)
 
 	// set headers
+	req.Header.Set("Content-Type", "text/html;charset=utf-8")
 	req.Header.Set("Spring-Version", s83.SpringVersion)
-	req.Header.Set("Authorization", fmt.Sprintf("Spring-83 Signature=%s", board.Signature()))
+	req.Header.Set("Spring-Signature", board.Signature())
 
 	// TODO(?): If-Unmodified-Since: <date and time in UTC, HTTP (RFC 5322) format>
 	req.Header.Set("If-Unmodified-Since", board.Timestamp())
@@ -152,7 +153,7 @@ func publishBoard(server *url.URL, board s83.Board) error {
 	body, err := io.ReadAll(res.Body)
 	exitOnError(err)
 
-	if res.StatusCode == http.StatusOK {
+	if res.StatusCode == http.StatusOK || res.StatusCode == http.StatusNoContent {
 		fmt.Println("[info] Success")
 		return nil
 	} else {
@@ -186,7 +187,7 @@ func Get(server *url.URL, key string) {
 		exitOnError(errors.New(res.Status))
 	}
 
-	board, err := s83.NewBoardFromHTTP(key, res.Header.Get("Authorization"), res.Body)
+	board, err := s83.NewBoardFromHTTP(key, res.Header.Get("Spring-Signature"), res.Body)
 	exitOnError(err)
 
 	// TODO: realm/trust management
