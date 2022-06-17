@@ -15,8 +15,8 @@ I'm springing at `db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e12
 
 Build client (`s83`) and server (`s83d`).
 ```
-$ go build -o bin/s83 cmd/client/*
-$ go build -o bin/s83d cmd/server/*
+$ go build -o bin/s83 ./cmd/client
+$ go build -o bin/s83d ./cmd/server
 $ cd bin
 ```
 

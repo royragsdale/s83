@@ -297,8 +297,7 @@ func ParseTimestamp(content []byte) (time.Time, error) {
 		}
 	}
 
-	// should not reach here
-	return time.Time{}, errors.New("Unable to find a valid time element")
+	// will not reach here
 }
 
 // TODO: level of precision for difficulty factor?
