@@ -19,6 +19,12 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	// Log requests (TODO: configurable verbosity)
 	log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 
+	// Servers must support preflight OPTIONS requests to all endpoints
+	if req.Method == http.MethodOptions {
+		srv.handleOptions(w, req)
+		return
+	}
+
 	// Common headers
 	w.Header().Set("Spring-Version", s83.SpringVersion)
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
@@ -59,6 +65,14 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 
 	// fallthrough failcase
 	http.Error(w, "400 - Bad Request", http.StatusBadRequest)
+}
+
+func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Modified-Since, Spring-Signature, Spring-Version")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Last-Modified, Spring-Difficulty, Spring-Signature, Spring-Version")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (srv *Server) handleDifficulty(w http.ResponseWriter, req *http.Request) {
