@@ -1,6 +1,7 @@
 package s83
 
 import (
+	"encoding/hex"
 	"math/big"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestGenCreator(t *testing.T) {
+	// fast: not necessarily a valid creator
 	creator, err := genCreator()
 	if err != nil || creator.PrivateKey == nil || creator.PublicKey == nil {
 		t.Fatalf(`Failure making creator: %v %v`, creator, err)
@@ -26,9 +28,24 @@ func TestLoadingFromTestKeys(t *testing.T) {
 		t.Fatalf(`Error loading creator from key: %v`, err)
 	}
 
+	if testCreator.Valid() {
+		t.Fatalf("Test creator should not be valid (expired)")
+	}
+
 	if !testCreator.PublicKey.Equal(testPublisher.PublicKey) {
 		t.Fatalf(`Error matching creator/publisher that share a key: %s %s`, testCreator, testPublisher)
 	}
+
+	_, err = NewCreatorFromKey("a")
+	if err == nil {
+		t.Errorf("NewCreatorFromKey should error on a short key")
+	}
+
+	_, err = NewCreatorFromKey("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+	if err == nil {
+		t.Errorf("NewCreatorFromKey should error on a a non-hex key")
+	}
+
 }
 
 func TestKeyValidity(t *testing.T) {
@@ -100,10 +117,27 @@ func TestBoardCreation(t *testing.T) {
 		t.Errorf("Board failed signature verification")
 	}
 
+	if len(board.Signature()) != sigLen {
+		t.Errorf("Signature should be %d long", keyLen)
+	}
+
 	// force invalid signature
 	board.signature = []byte("xxx")
 	if board.VerifySignature() {
 		t.Errorf("Board with bad signature should fail")
+	}
+
+	multipleTS := `<meta http-equiv="last-modified" content="Wed, 15 Jun 2011 00:55:36 GMT">
+					<meta http-equiv="last-modified" content="Thu, 16 Jun 2011 00:55:36 GMT">`
+	board, err = creator.NewBoard([]byte(multipleTS))
+	if err == nil {
+		t.Errorf("Board with multiple timestamps should fail")
+	}
+
+	futureTS := `<meta http-equiv="last-modified" content="Wed, 01 Jan 2983 00:00:00 GMT">`
+	board, err = creator.NewBoard([]byte(futureTS))
+	if err == nil {
+		t.Errorf("Board with future timestamps should fail")
 	}
 
 }
@@ -148,6 +182,30 @@ func TestDifficultyFactor(t *testing.T) {
 		if threshold.Cmp(tt.threshold) != 0 {
 			t.Errorf("Wrong key threshold: expected %d, actual %d", tt.threshold, threshold)
 		}
-
 	}
 }
+
+func TestStringFormats(t *testing.T) {
+	creator, err := genCreator()
+	if err != nil || creator.PrivateKey == nil || creator.PublicKey == nil {
+		t.Fatalf(`Failure making creator: %v %v`, creator, err)
+	}
+
+	keys := []string{creator.String(), creator.ExportPrivateKey(), creator.Publisher.String()}
+	for _, key := range keys {
+		if len(key) != keyLen {
+			t.Errorf("Creator should be %d long", keyLen)
+		}
+
+		_, err = hex.DecodeString(key)
+		if err != nil {
+			t.Errorf("Keys should be hex encoded")
+		}
+	}
+}
+
+// TODO: test strings
+// TODO: test NewBoard edge cases
+// TODO: NewBoardFromHTTP
+// TODO: parseAuthorizationHeader
+// TODO: test ParseTimestamp directly for edge cases (including capitalization)
