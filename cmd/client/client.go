@@ -140,6 +140,8 @@ func publishBoard(server *url.URL, board s83.Board) error {
 	// set headers
 	req.Header.Set("Spring-Version", s83.SpringVersion)
 	req.Header.Set("Authorization", fmt.Sprintf("Spring-83 Signature=%s", board.Signature()))
+
+	// TODO(?): If-Unmodified-Since: <date and time in UTC, HTTP (RFC 5322) format>
 	req.Header.Set("If-Unmodified-Since", board.Timestamp())
 
 	// make request
@@ -192,6 +194,24 @@ func Get(server *url.URL, key string) {
 	// remove the server from its list of trustworthy peers
 
 	// TODO: situate each board inside its own Shadow DOM (combine multiple boards?)
+
+	// TODO: Clients should scan for the <link rel="next"> element:
+	// <link rel="next" href="<URL>">
+
+	// TODO: the client may also scan for arbitrary data stored in
+	// data-spring-* attributes throughout the board.
+
+	// TODO: Content Security Policy (CSP) to prevent images and js/fonts/media
+	/*
+		default-src 'none';
+		style-src 'self' 'unsafe-inline';
+		font-src 'self';
+		script-src 'self';
+		form-action *;
+		connect-src *;
+	*/
+
+	// TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
 
 	// cli only at the moment > to a file and view in a browser
 	fmt.Print(board)

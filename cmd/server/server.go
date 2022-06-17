@@ -135,14 +135,6 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
-	// fast fail
-	// "client must include the publishing timestamp in the If-Unmodified-Since header"
-	modSinceHead, err := http.ParseTime(req.Header.Get("If-Unmodified-Since"))
-	if err != nil || modSinceHead.After(time.Now()) {
-		http.Error(w, "400 - Invalid If-Unmodified-Since", http.StatusBadRequest)
-		return
-	}
-
 	// TODO: blocklist
 
 	// Validate Board (size, signature, timestamp)
@@ -160,8 +152,6 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	// there was a valid existing board
 	if err == nil {
 		if !board.After(existingBoard) {
-			fmt.Println(board.Timestamp())
-			fmt.Println(existingBoard.Timestamp())
 			http.Error(w, "409 - Submission older than existing board", http.StatusConflict)
 			return
 		}
