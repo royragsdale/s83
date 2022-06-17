@@ -9,7 +9,7 @@ for fun.
 **Very much in flux**, but sufficiently conformant to publish and get from the
 demo server!
 
-I'm posting at `db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223`.
+I'm springing at `db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223`.
 
 ## Quick Start/Demo
 
