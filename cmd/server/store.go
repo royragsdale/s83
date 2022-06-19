@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/royragsdale/s83"
 )
@@ -19,7 +16,7 @@ the file is the signature. Everything else is the content.
 */
 
 type Store struct {
-	Path      string
+	Dir       string
 	NumBoards int
 	//Cache     map[string]s83.Board
 }
@@ -46,7 +43,7 @@ func loadStore(path string) (*Store, error) {
 
 // validate walks the store directory and checks all the boards
 func (s *Store) validate() error {
-	pattern := filepath.Join(s.Path, "*.s83")
+	pattern := filepath.Join(s.Dir, "*.s83")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return err
@@ -54,7 +51,7 @@ func (s *Store) validate() error {
 
 	for _, boardPath := range matches {
 		//TODO: instead of discarding fill cache
-		_, err := s.boardFromPath(boardPath)
+		_, err := s83.BoardFromPath(boardPath)
 		if err != nil {
 			log.Printf("[warn] bad board at %s: %v\n", filepath.Base(boardPath), err)
 		} else {
@@ -66,41 +63,13 @@ func (s *Store) validate() error {
 }
 
 func (s *Store) boardFromKey(key string) (s83.Board, error) {
-	return s.boardFromPath(s.keyToPath(key))
-}
-
-func (s *Store) boardFromPath(path string) (s83.Board, error) {
-
-	// TODO: validate path is in store
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return s83.Board{}, err
-	}
-	line := bytes.Index(data, []byte("\n"))
-
-	// first line stores the signature
-	sig, err := hex.DecodeString(string(data[:line]))
-	if err != nil {
-		return s83.Board{}, err
-	}
-	// everything else is content
-	content := data[line+1:]
-
-	// validate on creation
-	return s83.NewBoard(pathToKey(path), sig, content)
-}
-
-func (s *Store) saveBoard(board s83.Board) error {
-	path := s.keyToPath(board.Publisher.String())
-	data := append([]byte(board.Signature()+"\n"), board.Content...)
-	return os.WriteFile(path, data, 0600)
+	return s83.BoardFromPath(s.keyToPath(key))
 }
 
 func (s *Store) keyToPath(key string) string {
-	return filepath.Join(s.Path, fmt.Sprintf("%s.s83", key))
+	return filepath.Join(s.Dir, fmt.Sprintf("%s.s83", key))
 }
 
-func pathToKey(path string) string {
-	// extract publisher key from file name
-	return strings.TrimSuffix(filepath.Base(path), ".s83")
+func (s *Store) saveBoard(board s83.Board) error {
+	return board.Save(s.Dir)
 }

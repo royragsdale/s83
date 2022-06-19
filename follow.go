@@ -54,7 +54,7 @@ func (f Follow) GetBoard() (Board, error) {
 		return Board{}, fmt.Errorf("Status code: %v", res.Status)
 	}
 
-	return NewBoardFromHTTP(f.publisher.String(), res.Header.Get("Spring-Signature"), res.Body)
+	return BoardFromHTTP(f.publisher.String(), res.Header.Get("Spring-Signature"), res.Body)
 }
 
 // attempt to conform to the Springfile format of the demo client

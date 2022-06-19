@@ -1,11 +1,16 @@
 package s83
 
 import (
+	"bytes"
 	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -43,6 +48,14 @@ func (b Board) After(other Board) bool {
 	return b.timestamp.After(other.timestamp)
 }
 
+// TODO: this clobbers old files, which matches the ephemeral nature of the protocol
+// but may want to provide an option for keeping around old boards.
+func (b Board) Save(dir string) error {
+	path := filepath.Join(dir, fmt.Sprintf("%s.s83", b.Publisher.String()))
+	data := append([]byte(b.Signature()+"\n"), b.Content...)
+	return os.WriteFile(path, data, 0600)
+}
+
 func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 	board := Board{}
 	publisher, err := NewPublisherFromKey(key)
@@ -78,7 +91,7 @@ func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 	return board, nil
 }
 
-func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error) {
+func BoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error) {
 	// Signature
 	sig, err := parseSignatureHeader(auth)
 	if err != nil {
@@ -90,4 +103,30 @@ func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error
 		return Board{}, err
 	}
 	return NewBoard(key, sig, content)
+}
+
+func BoardFromPath(path string) (Board, error) {
+
+	// TODO: validate path is in store
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Board{}, err
+	}
+	line := bytes.Index(data, []byte("\n"))
+
+	// first line stores the signature
+	sig, err := hex.DecodeString(string(data[:line]))
+	if err != nil {
+		return Board{}, err
+	}
+	// everything else is content
+	content := data[line+1:]
+
+	// validate on creation
+	return NewBoard(keyFromPath(path), sig, content)
+}
+
+func keyFromPath(path string) string {
+	// extract publisher key from file name
+	return strings.TrimSuffix(filepath.Base(path), ".s83")
 }

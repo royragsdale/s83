@@ -138,7 +138,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	// TODO: blocklist
 
 	// Validate Board (size, signature, timestamp)
-	board, err := s83.NewBoardFromHTTP(key, req.Header.Get("Spring-Signature"), req.Body)
+	board, err := s83.BoardFromHTTP(key, req.Header.Get("Spring-Signature"), req.Body)
 	if err != nil {
 		// TODO: handle 400/401/409/513
 		// 400: Board was submitted with impromper meta timestamp tags.
@@ -182,7 +182,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Path)
+	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
 
 	srv := &Server{store}
 
