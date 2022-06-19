@@ -16,19 +16,18 @@ import (
 	"github.com/royragsdale/s83"
 )
 
-func main() {
-	config := loadConfig()
-	dispatchCommand(config)
-}
-
 // ref: https://gobyexample.com/command-line-subcommands
-func dispatchCommand(config Config) {
+func main() {
 
 	// TODO: add global flags (e.g. config/verbose)
+	var confFlag = flag.String("c", configName, "name of configuration file to use")
 
 	// New creator
 	// TODO: add flags for, difficulty, check existence
 	newCmd := flag.NewFlagSet("new", flag.ExitOnError)
+
+	// Display configuration information (e.g. which "profile") is in use
+	whoCmd := flag.NewFlagSet("who", flag.ExitOnError)
 
 	// Publish a board
 	// TODO: add flags to store locally, board on CLI, board from file
@@ -45,20 +44,53 @@ func dispatchCommand(config Config) {
 		fmt.Fprintf(getCmd.Output(), "usage: get <public>\n")
 	}
 
-	if len(os.Args) < 2 {
-		fmt.Println("expected 'get', 'pub', or 'new' subcommand")
-		os.Exit(1)
+	cmds := []struct {
+		name string
+		fs   *flag.FlagSet
+	}{
+		{"pub", pubCmd},
+		{"get", getCmd},
+		{"new", newCmd},
+		{"who", whoCmd},
 	}
 
+	// TODO: list of commands with descriptions
+	// build up expected usage
+	expectedStr := "expected a subcommand:"
+	for i, cmd := range cmds {
+		if i > 0 {
+			expectedStr += ","
+		}
+		if i == len(cmds)-1 {
+			expectedStr += " or"
+		}
+		expectedStr += fmt.Sprintf(` '%s'`, cmd.name)
+	}
+
+	// parse global flags
+	flag.Parse()
+	config := loadConfig(*confFlag)
+
+	if flag.NArg() < 1 {
+		// TODO: proper usage
+		fmt.Println(expectedStr)
+		os.Exit(1)
+	}
+	subArgs := flag.Args()[1:]
+
 	// Check which subcommand is invoked.
-	switch os.Args[1] {
+	switch flag.Arg(0) {
 
 	case "new":
-		newCmd.Parse(os.Args[2:])
-		New()
+		newCmd.Parse(subArgs)
+		config.New()
+
+	case "who":
+		whoCmd.Parse(subArgs)
+		config.Who()
 
 	case "pub":
-		pubCmd.Parse(os.Args[2:])
+		pubCmd.Parse(subArgs)
 		if pubCmd.NArg() != 1 {
 			pubCmd.Usage()
 			fmt.Println("<path> to file to be published is required")
@@ -68,35 +100,35 @@ func dispatchCommand(config Config) {
 		if !config.Creator.Valid() {
 			fmt.Println("[ERROR] Invalid creator configuration.")
 			fmt.Println("[info] use `s83 new` to a 'secret'")
-			fmt.Printf("[info] then add a 'secret=' line to your config file (%s)\n", configPath())
+			fmt.Printf("[info] then add a 'secret=' line to your config file (%s)\n", config.Path)
 			os.Exit(1)
 		}
 
 		if config.Server == nil {
 			fmt.Println("[ERROR] missing server configuration.")
-			fmt.Printf("[info] add a 'server=' line to your config file (%s)\n", configPath())
+			fmt.Printf("[info] add a 'server=' line to your config file (%s)\n", config.Path)
 			os.Exit(1)
 		}
 
-		Pub(config, pubCmd.Arg(0))
+		config.Pub(pubCmd.Arg(0))
 
 	case "get":
-		getCmd.Parse(os.Args[2:])
+		getCmd.Parse(subArgs)
 		if getCmd.NArg() != 1 {
 			getCmd.Usage()
 			fmt.Println("<public> board to get is required")
 			os.Exit(1)
 		}
 
-		Get(config.Server, getCmd.Arg(0))
+		config.Get(getCmd.Arg(0))
 
 	default:
-		fmt.Println("expected 'get', 'pub', or 'new' subcommand")
+		fmt.Println(expectedStr)
 		os.Exit(1)
 	}
 }
 
-func New() {
+func (config Config) New() {
 	fmt.Println("[info] Generating a new creator key. Please be patient.")
 	start := time.Now()
 
@@ -118,7 +150,11 @@ func New() {
 	fmt.Println("secret:", creator.ExportPrivateKey())
 }
 
-func Pub(config Config, path string) {
+func (config Config) Who() {
+	fmt.Print(config)
+}
+
+func (config Config) Pub(path string) {
 	data, err := os.ReadFile(path)
 	exitOnError(err)
 
@@ -162,7 +198,8 @@ func publishBoard(server *url.URL, board s83.Board) error {
 	}
 }
 
-func Get(server *url.URL, key string) {
+func (config Config) Get(key string) {
+	server := config.Server
 	// sanity check key locally
 	_, err := s83.NewPublisherFromKey(key)
 	exitOnError(err)

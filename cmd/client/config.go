@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 
@@ -19,6 +20,7 @@ secret =
 server =`
 
 type Config struct {
+	Path    string
 	Creator s83.Creator
 	Server  *url.URL
 }
@@ -31,17 +33,22 @@ func configDir() string {
 	return filepath.Join(configRoot, "s83")
 }
 
-func configPath() string {
-	return filepath.Join(configDir(), configName)
+func configPath(name string) string {
+	return filepath.Join(configDir(), name)
 }
 
-func initConfig() []byte {
+func initConfig(name string) []byte {
 	configDir := configDir()
-	configPath := configPath()
+	configPath := configPath(name)
 
 	err := os.MkdirAll(configDir, 0700)
 	if err != nil {
 		log.Fatalf("Error creating config directory: %s : %v", configDir, err)
+	}
+
+	_, err = os.ReadFile(configPath)
+	if !errors.Is(err, os.ErrNotExist) {
+		log.Fatalf("Error: config (%s) already exists refusing to clobber", configPath)
 	}
 
 	config, err := os.Create(configPath)
@@ -104,15 +111,30 @@ func parseConfig(data []byte) Config {
 	return config
 }
 
-func loadConfig() Config {
-	configPath := configPath()
+func loadConfig(name string) Config {
+	configPath := configPath(name)
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("[info] Config did not exist. Initializing a config at %s\n", configPath)
-		data = initConfig()
+		data = initConfig(name)
 
 	} else if err != nil {
 		log.Fatalf("Error loading config: %v\n", err)
 	}
-	return parseConfig(data)
+	config := parseConfig(data)
+	config.Path = configPath
+	return config
+}
+
+func (config Config) name() string {
+	return path.Base(config.Path)
+}
+
+func (config Config) String() string {
+	display := fmt.Sprintf("name   : %s\n", config.name())
+	display += fmt.Sprintf("path   : %s\n", config.Path)
+	display += fmt.Sprintf("server : %s\n", config.Server)
+	display += fmt.Sprintf("pub    : %s\n", config.Creator)
+
+	return display
 }
