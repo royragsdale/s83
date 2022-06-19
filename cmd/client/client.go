@@ -40,7 +40,7 @@ func main() {
 	// TODO: saved list of boards to fetch (e.g. subscription)
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getCmd.Usage = func() {
-		fmt.Fprintf(getCmd.Output(), "usage: get <public>\n")
+		fmt.Fprintf(getCmd.Output(), "usage: get [public]\n")
 	}
 
 	cmds := []struct {
@@ -113,9 +113,8 @@ func main() {
 
 	case "get":
 		getCmd.Parse(subArgs)
-		if getCmd.NArg() != 1 {
+		if getCmd.NArg() > 1 {
 			getCmd.Usage()
-			fmt.Println("<public> board to get is required")
 			os.Exit(1)
 		}
 
@@ -197,61 +196,51 @@ func publishBoard(server *url.URL, board s83.Board) error {
 	}
 }
 
+// TODO: realm/trust management
+// "If the signature is not valid,the client must drop the response and
+// remove the server from its list of trustworthy peers
+
+// TODO: situate each board inside its own Shadow DOM (combine multiple boards?)
+
+// TODO: Clients should scan for the <link rel="next"> element:
+// <link rel="next" href="<URL>">
+
+// TODO: the client may also scan for arbitrary data stored in
+// data-spring-* attributes throughout the board.
+
+// TODO: Content Security Policy (CSP) to prevent images and js/fonts/media
+/*
+	default-src 'none';
+	style-src 'self' 'unsafe-inline';
+	font-src 'self';
+	script-src 'self';
+	form-action *;
+	connect-src *;
+*/
+
+// TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
+
+// cli only at the moment > to a file and view in a browser
 func (config Config) Get(key string) {
-	server := config.Server
-	// sanity check key locally
-	_, err := s83.NewPublisherFromKey(key)
-	exitOnError(err)
+	follows := config.Follows
 
-	// add publisher key to URL
-	server.Path = path.Join(server.Path, key)
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", server.String(), nil)
-	exitOnError(err)
-
-	// set headers
-	req.Header.Set("Spring-Version", s83.SpringVersion)
-	// TODO: optional
-	//req.Header.Set("If-Modified-Since", time.Now().UTC().Format(http.TimeFormat))
-
-	// make request
-	res, err := client.Do(req)
-	exitOnError(err)
-
-	if res.StatusCode != http.StatusOK {
-		exitOnError(errors.New(res.Status))
+	// single key specified
+	if key != "" {
+		keyURL := config.Server
+		keyURL.Path = path.Join(keyURL.Path, key)
+		f, err := s83.NewFollow(key, keyURL.String(), "")
+		exitOnError(err)
+		follows = []s83.Follow{f}
 	}
 
-	board, err := s83.NewBoardFromHTTP(key, res.Header.Get("Spring-Signature"), res.Body)
-	exitOnError(err)
-
-	// TODO: realm/trust management
-	// "If the signature is not valid,the client must drop the response and
-	// remove the server from its list of trustworthy peers
-
-	// TODO: situate each board inside its own Shadow DOM (combine multiple boards?)
-
-	// TODO: Clients should scan for the <link rel="next"> element:
-	// <link rel="next" href="<URL>">
-
-	// TODO: the client may also scan for arbitrary data stored in
-	// data-spring-* attributes throughout the board.
-
-	// TODO: Content Security Policy (CSP) to prevent images and js/fonts/media
-	/*
-		default-src 'none';
-		style-src 'self' 'unsafe-inline';
-		font-src 'self';
-		script-src 'self';
-		form-action *;
-		connect-src *;
-	*/
-
-	// TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
-
-	// cli only at the moment > to a file and view in a browser
-	fmt.Print(board)
+	for _, f := range follows {
+		board, err := f.GetBoard()
+		if err != nil {
+			fmt.Printf("[ERROR] getting board for %s: %v\n", f, err)
+			continue
+		}
+		fmt.Print(board)
+	}
 }
 
 func exitOnError(err error) {
