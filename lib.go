@@ -7,15 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
-	"math/big"
-	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"golang.org/x/net/html"
 )
@@ -27,8 +21,6 @@ const keyLen = 64
 const sigLen = 128
 
 const maxNumBoards = 10_000_000
-
-const maxBoardLen = 2217
 
 const yearBase = 2000 // update in year 3000
 
@@ -173,86 +165,6 @@ func (s Signature) String() string {
 	return hex.EncodeToString(s)
 }
 
-type Board struct {
-	Publisher Publisher
-	timestamp time.Time
-	signature Signature
-	Content   []byte
-}
-
-func (b Board) String() string {
-	return fmt.Sprintf("verifies  : %t\ncreator   : %s\nsignature : %s\n%s", b.VerifySignature(), b.Publisher, b.signature, b.Content)
-}
-
-func (b Board) VerifySignature() bool {
-	if len(b.Publisher.PublicKey) == 0 || b.signature == nil {
-		return false
-	}
-	return ed25519.Verify(b.Publisher.PublicKey, b.Content, b.signature)
-}
-
-func (b Board) Timestamp() string {
-	// TODO (?):  If-Unmodified-Since: <date and time in UTC, HTTP (RFC 5322) format>
-	return b.timestamp.Format(http.TimeFormat)
-}
-
-func (b Board) Signature() string {
-	return b.signature.String()
-}
-
-func (b Board) After(other Board) bool {
-	return b.timestamp.After(other.timestamp)
-}
-
-func NewBoard(key string, sig Signature, content []byte) (Board, error) {
-	board := Board{}
-	publisher, err := NewPublisherFromKey(key)
-	if err != nil {
-		return Board{}, err
-	}
-	board.Publisher = publisher
-
-	// validate encoding requirement
-	if !utf8.Valid(content) {
-		return Board{}, errors.New("Invalid Board: not UTF-8")
-	}
-	// validate size requirement
-	if len(content) > maxBoardLen {
-		return Board{}, errors.New("Invalid Board: too large")
-	}
-	board.Content = content
-
-	// validate signature (can we trust the content)
-	board.signature = sig
-	if !board.VerifySignature() {
-		return Board{}, errors.New("Invalid Signature")
-	}
-
-	// validate "last-modified meta tag"
-	ts, err := ParseTimestamp(content)
-	if err != nil {
-		return Board{}, err
-	}
-	board.timestamp = ts
-
-	// all checks pass, good board
-	return board, nil
-}
-
-func NewBoardFromHTTP(key string, auth string, body io.ReadCloser) (Board, error) {
-	// Signature
-	sig, err := parseSignatureHeader(auth)
-	if err != nil {
-		return Board{}, err
-	}
-	// Content
-	content, err := io.ReadAll(body)
-	if err != nil {
-		return Board{}, err
-	}
-	return NewBoard(key, sig, content)
-}
-
 func parseSignatureHeader(auth string) (Signature, error) {
 	//Spring-Signature: <signature>
 	reSig := regexp.MustCompile(`^[0-9A-Fa-f]{128}$`)
@@ -300,109 +212,4 @@ func ParseTimestamp(content []byte) (time.Time, error) {
 	}
 
 	// will not reach here
-}
-
-// TODO: level of precision for difficulty factor?
-// difficultyFactor = ( numBoards / 10_000_000 )**4
-func DifficultyFactor(numBoards int) float64 {
-	return math.Pow(float64(numBoards)/maxNumBoards, 4)
-}
-
-// maxKey = (2**256 - 1)
-func maxKey() *big.Int {
-	maxKey := big.NewInt(2)
-	maxKey.Exp(maxKey, big.NewInt(256), nil)
-	maxKey.Sub(maxKey, big.NewInt(1))
-	return maxKey
-}
-
-// keyThreshold = maxKey * ( 1.0 - difficultyFactor )
-func KeyThreshold(difficultyFactor float64) *big.Int {
-	threshold := new(big.Float)
-	threshold.Sub(big.NewFloat(1), big.NewFloat(difficultyFactor))
-	threshold.Mul(threshold, new(big.Float).SetInt(maxKey()))
-
-	res, _ := threshold.Int(nil)
-	return res
-}
-
-type Follow struct {
-	publisher Publisher
-	url       *url.URL
-	handle    string
-}
-
-func NewFollow(key string, urlStr string, handle string) (Follow, error) {
-	pub, err := NewPublisherFromKey(key)
-	if err != nil {
-		return Follow{}, err
-	}
-
-	url, err := url.Parse(urlStr)
-	if err != nil {
-		return Follow{}, err
-	}
-
-	return Follow{pub, url, handle}, nil
-}
-
-func (f Follow) String() string {
-	return fmt.Sprintf("%s %s @ %s", f.publisher, f.handle, f.url.Host)
-}
-
-func (f Follow) GetBoard() (Board, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", f.url.String(), nil)
-	if err != nil {
-		return Board{}, err
-	}
-
-	// set headers
-	req.Header.Set("Spring-Version", SpringVersion)
-	// TODO: optional
-	//req.Header.Set("If-Modified-Since", time.Now().UTC().Format(http.TimeFormat))
-
-	// make request
-	res, err := client.Do(req)
-	if err != nil {
-		return Board{}, err
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return Board{}, fmt.Errorf("Status code: %v", res.Status)
-	}
-
-	return NewBoardFromHTTP(f.publisher.String(), res.Header.Get("Spring-Signature"), res.Body)
-}
-
-// attempt to conform to the Springfile format of the demo client
-func ParseSpringfileFollows(data []byte) []Follow {
-	springfile := string(data)
-	follows := []Follow{}
-
-	handle := ""
-	for _, line := range strings.Split(springfile, "\n") {
-		line = strings.TrimSuffix(line, "\n")
-		// skip blank/comment lines (and reset handle)
-		if len(line) == 0 || line[0] == '#' {
-			handle = ""
-			continue
-		}
-
-		reSpringURL := regexp.MustCompile(`^http[s]?:\/\/(.*)\/([0-9A-Fa-f]{57}83e(0[1-9]|1[0-2])\d\d)$`)
-		springURLMatch := reSpringURL.FindStringSubmatch(line)
-		if springURLMatch != nil {
-			key := springURLMatch[2]
-			f, err := NewFollow(key, line, handle)
-			if err != nil {
-				continue
-			}
-			follows = append(follows, f)
-			handle = ""
-		} else {
-			// keep line around as handle
-			handle = line
-		}
-	}
-	return follows
 }
