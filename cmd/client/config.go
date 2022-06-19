@@ -13,7 +13,7 @@ import (
 	"github.com/royragsdale/s83"
 )
 
-const configName = "config"
+const defaultConfigName = "config"
 
 const blankConfig = `public =
 secret =
@@ -23,6 +23,7 @@ type Config struct {
 	Path    string
 	Creator s83.Creator
 	Server  *url.URL
+	Follows []s83.Follow
 }
 
 func configDir() string {
@@ -108,6 +109,7 @@ func parseConfig(data []byte) Config {
 			config.Creator = creator
 		}
 	}
+	config.Follows = s83.ParseSpringfileFollows(data)
 	return config
 }
 
@@ -131,10 +133,14 @@ func (config Config) name() string {
 }
 
 func (config Config) String() string {
-	display := fmt.Sprintf("name   : %s\n", config.name())
-	display += fmt.Sprintf("path   : %s\n", config.Path)
-	display += fmt.Sprintf("server : %s\n", config.Server)
-	display += fmt.Sprintf("pub    : %s\n", config.Creator)
+	display := fmt.Sprintf("name    : %s\n", config.name())
+	display += fmt.Sprintf("path    : %s\n", config.Path)
+	display += fmt.Sprintf("server  : %s\n", config.Server)
+	display += fmt.Sprintf("pub     : %s\n", config.Creator)
+	display += fmt.Sprintf("follows :\n")
+	for _, follow := range config.Follows {
+		display += fmt.Sprintf("%s\n", follow)
+	}
 
 	return display
 }

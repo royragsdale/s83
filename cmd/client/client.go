@@ -20,8 +20,7 @@ import (
 func main() {
 
 	// TODO: add global flags (e.g. config/verbose)
-	var confFlag = flag.String("c", configName, "name of configuration file to use")
-
+	var confFlag = flag.String("c", defaultConfigName, "name of configuration file to use")
 	// New creator
 	// TODO: add flags for, difficulty, check existence
 	newCmd := flag.NewFlagSet("new", flag.ExitOnError)

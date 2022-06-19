@@ -14,5 +14,5 @@ func TestLoad(t *testing.T) {
 		t.Fatalf(`Failure setting "XDG_CONFIG_HOME": %v`, err)
 	}
 
-	loadConfig()
+	loadConfig(defaultConfigName)
 }

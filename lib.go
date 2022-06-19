@@ -10,8 +10,10 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -322,4 +324,52 @@ func KeyThreshold(difficultyFactor float64) *big.Int {
 
 	res, _ := threshold.Int(nil)
 	return res
+}
+
+type Follow struct {
+	publisher Publisher
+	url       *url.URL
+	handle    string
+}
+
+func (f Follow) String() string {
+	return fmt.Sprintf("%s %s @ %s", f.publisher, f.handle, f.url.Host)
+}
+
+// attempt to conform to the Springfile format of the demo client
+func ParseSpringfileFollows(data []byte) []Follow {
+	springfile := string(data)
+	follows := []Follow{}
+
+	handle := ""
+	for _, line := range strings.Split(springfile, "\n") {
+		line = strings.TrimSuffix(line, "\n")
+		// skip blank/comment lines (and reset handle)
+		if len(line) == 0 || line[0] == '#' {
+			handle = ""
+			continue
+		}
+
+		reSpringURL := regexp.MustCompile(`^http[s]?:\/\/(.*)\/([0-9A-Fa-f]{57}83e(0[1-9]|1[0-2])\d\d)$`)
+		springURLMatch := reSpringURL.FindStringSubmatch(line)
+		if springURLMatch != nil {
+			url, err := url.Parse(line)
+			if err != nil {
+				continue
+			}
+
+			key := springURLMatch[2]
+			publisher, err := NewPublisherFromKey(key)
+			if err != nil {
+				continue
+			}
+
+			follows = append(follows, Follow{publisher, url, handle})
+			handle = ""
+		} else {
+			// keep line around as handle
+			handle = line
+		}
+	}
+	return follows
 }
