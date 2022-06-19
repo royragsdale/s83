@@ -19,8 +19,9 @@ import (
 // ref: https://gobyexample.com/command-line-subcommands
 func main() {
 
-	// TODO: add global flags (e.g. config/verbose)
+	// TODO: add global verbose flag
 	var confFlag = flag.String("c", defaultConfigName, "name of configuration file to use")
+
 	// New creator
 	// TODO: add flags for, difficulty, check existence
 	newCmd := flag.NewFlagSet("new", flag.ExitOnError)
@@ -99,13 +100,13 @@ func main() {
 		if !config.Creator.Valid() {
 			fmt.Println("[ERROR] Invalid creator configuration.")
 			fmt.Println("[info] use `s83 new` to a 'secret'")
-			fmt.Printf("[info] then add a 'secret=' line to your config file (%s)\n", config.Path)
+			fmt.Printf("[info] then add a 'secret=' line to your config file (%s)\n", config.Path())
 			os.Exit(1)
 		}
 
 		if config.Server == nil {
 			fmt.Println("[ERROR] missing server configuration.")
-			fmt.Printf("[info] add a 'server=' line to your config file (%s)\n", config.Path)
+			fmt.Printf("[info] add a 'server=' line to your config file (%s)\n", config.Path())
 			os.Exit(1)
 		}
 
@@ -209,14 +210,6 @@ func publishBoard(server *url.URL, board s83.Board) error {
 // data-spring-* attributes throughout the board.
 
 // TODO: Content Security Policy (CSP) to prevent images and js/fonts/media
-/*
-	default-src 'none';
-	style-src 'self' 'unsafe-inline';
-	font-src 'self';
-	script-src 'self';
-	form-action *;
-	connect-src *;
-*/
 
 // TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
 
@@ -233,14 +226,19 @@ func (config Config) Get(key string) {
 		follows = []s83.Follow{f}
 	}
 
+	boards := []s83.Board{}
 	for _, f := range follows {
-		board, err := f.GetBoard()
+		b, err := f.GetBoard()
 		if err != nil {
-			fmt.Printf("[ERROR] getting board for %s: %v\n", f, err)
+			fmt.Printf("[warn] failed to get board for %s: %v\n", f, err)
 			continue
 		}
-		fmt.Print(board)
+		boards = append(boards, b)
 	}
+	for _, b := range boards {
+		b.Save(config.DataPath())
+	}
+	fmt.Printf("[info] Success. Saved %d boards to %s\n", len(boards), config.DataPath())
 }
 
 func exitOnError(err error) {

@@ -33,13 +33,15 @@ $ ./s83 new
 ```
 
 Add the keys you just generated to your client configuration and set the server
-to point at your local server like so.
-
-`~/.config/s83/config`
+to point at your local server like so. Aside from the simple `key = value` lines
+this attempts to conform to the "Springfile" convention.
+`~/.config/s83/default`
 ```
-public = db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
 secret = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 server = http://localhost:8080
+
+me
+http://localhost:8080/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
 ```
 
 Verify you can reach your server by getting the ever-changing test board.

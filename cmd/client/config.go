@@ -6,21 +6,20 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 
 	"github.com/royragsdale/s83"
 )
 
-const defaultConfigName = "config"
+const defaultConfigName = "default"
 
 const blankConfig = `public =
 secret =
 server =`
 
 type Config struct {
-	Path    string
+	Name    string
 	Creator s83.Creator
 	Server  *url.URL
 	Follows []s83.Follow
@@ -38,9 +37,19 @@ func configPath(name string) string {
 	return filepath.Join(configDir(), name)
 }
 
+func (c Config) Path() string {
+	return filepath.Join(configDir(), c.Name)
+}
+
+func (c Config) DataPath() string {
+	return filepath.Join(configDir(), "data", c.Name)
+}
+
 func initConfig(name string) []byte {
+	config := Config{}
+	config.Name = name
 	configDir := configDir()
-	configPath := configPath(name)
+	configPath := config.Path()
 
 	err := os.MkdirAll(configDir, 0700)
 	if err != nil {
@@ -52,23 +61,23 @@ func initConfig(name string) []byte {
 		log.Fatalf("Error: config (%s) already exists refusing to clobber", configPath)
 	}
 
-	config, err := os.Create(configPath)
+	cFile, err := os.Create(configPath)
 	if err != nil {
 		log.Fatalf("Error creating config file: %s : %v", configPath, err)
 	}
-	defer config.Close()
+	defer cFile.Close()
 
 	// set mode to User R/W since it will contain a private key
-	err = config.Chmod(0600)
+	err = cFile.Chmod(0600)
 	if err != nil {
 		log.Fatalf("Error setting permissions on initial config: %v", err)
 	}
 
-	_, err = config.Write([]byte(blankConfig))
+	_, err = cFile.Write([]byte(blankConfig))
 	if err != nil {
 		log.Fatalf("Error storing initial config: %v", err)
 	}
-	config.Close()
+	cFile.Close()
 
 	// confirm we can re-read the file
 	data, err := os.ReadFile(configPath)
@@ -114,7 +123,10 @@ func parseConfig(data []byte) Config {
 }
 
 func loadConfig(name string) Config {
-	configPath := configPath(name)
+	config := Config{}
+	config.Name = name
+	configPath := config.Path()
+
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("[info] Config did not exist. Initializing a config at %s\n", configPath)
@@ -123,18 +135,30 @@ func loadConfig(name string) Config {
 	} else if err != nil {
 		log.Fatalf("Error loading config: %v\n", err)
 	}
-	config := parseConfig(data)
-	config.Path = configPath
+
+	// check permissions
+	fi, err := os.Stat(configPath)
+	if err != nil {
+		log.Fatalf("Error checking permissions on config: %v\n", err)
+	} else if fi.Mode() != 0600 {
+		log.Fatal("Insecure configuration must be 0600 to protect your private key")
+	}
+
+	// ensure config data dir exists
+	dataPath := config.DataPath()
+	err = os.MkdirAll(dataPath, 0700)
+	if err != nil {
+		log.Fatalf("Error creating config data directory: %s : %v", dataPath, err)
+	}
+
+	config = parseConfig(data)
+	config.Name = name
 	return config
 }
 
-func (config Config) name() string {
-	return path.Base(config.Path)
-}
-
 func (config Config) String() string {
-	display := fmt.Sprintf("name    : %s\n", config.name())
-	display += fmt.Sprintf("path    : %s\n", config.Path)
+	display := fmt.Sprintf("name    : %s\n", config.Name)
+	display += fmt.Sprintf("path    : %s\n", config.Path())
 	display += fmt.Sprintf("server  : %s\n", config.Server)
 	display += fmt.Sprintf("pub     : %s\n", config.Creator)
 	display += fmt.Sprintf("follows :\n")
