@@ -5,7 +5,9 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/royragsdale/s83"
@@ -175,7 +177,16 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 func main() {
 	// TODO: configure from ENV/file
 	host := ""
+
 	port := 8080
+	envPort := os.Getenv("PORT")
+	if envPort != "" {
+		p, err := strconv.Atoi(envPort)
+		if err != nil {
+			log.Fatalf("failed parsing PORT: %v\n", err)
+		}
+		port = p
+	}
 	storePath := "store"
 
 	store, err := loadStore(storePath)
