@@ -3,7 +3,6 @@ package s83
 import (
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
 	"testing"
@@ -157,49 +156,6 @@ func TestBoardCreation(t *testing.T) {
 
 }
 
-func TestDifficultyFactor(t *testing.T) {
-	type difficultyTest struct {
-		num       int
-		factor    float64
-		threshold *big.Int
-	}
-
-	// setup <an inscrutable gigantic number> (matches example in spec)
-	specExBoards := 8_500_000
-	specExFactor := 0.5220062499999999
-	gS := "55347894954879420465823292524996605235896494567000172791001875836472156749824"
-	gF := new(big.Float)
-	gF, _, err := gF.Parse(gS, 10)
-	if err != nil {
-		t.Fatalf("Error creating fixed threshold test value (parsing)")
-	}
-
-	specExThresh, acc := gF.Int(nil)
-	if acc != big.Exact {
-		t.Fatalf("Error creating fixed threshold test value (converting)")
-	}
-
-	var difficultyTests = []difficultyTest{
-		// TODO: check off by one, intuitively it is ok that it is 1 more
-		// because keys have to be "less than" the threshold, but why?
-		{0, 0, maxKey().Add(maxKey(), big.NewInt(1))},
-		{specExBoards, specExFactor, specExThresh},
-		{maxNumBoards, 1, big.NewInt(0)},
-	}
-
-	for _, tt := range difficultyTests {
-		df := DifficultyFactor(tt.num)
-		threshold := KeyThreshold(df)
-		if df != tt.factor {
-			t.Errorf("Wrong difficulty factor: expected %f, actual %f", tt.factor, df)
-		}
-
-		if threshold.Cmp(tt.threshold) != 0 {
-			t.Errorf("Wrong key threshold: expected %d, actual %d", tt.threshold, threshold)
-		}
-	}
-}
-
 func TestStringFormats(t *testing.T) {
 	creator, err := genCreator()
 	if err != nil || creator.PrivateKey == nil || creator.PublicKey == nil {
@@ -219,6 +175,7 @@ func TestStringFormats(t *testing.T) {
 	}
 }
 
+// TODO: difficulty/threshold
 // TODO: test strings
 // TODO: test NewBoard edge cases
 // TODO: NewBoardFromHTTP

@@ -14,7 +14,8 @@ import (
 )
 
 type Server struct {
-	store *Store
+	store            *Store
+	difficultyFactor float64
 }
 
 func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
@@ -79,9 +80,7 @@ func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
 
 func (srv *Server) handleDifficulty(w http.ResponseWriter, req *http.Request) {
 
-	//numBoards := 8_500_000
-	difficultyFactor := s83.DifficultyFactor(srv.store.NumBoards)
-	w.Header().Set("Spring-Difficulty", fmt.Sprintf("%f", difficultyFactor))
+	w.Header().Set("Spring-Difficulty", fmt.Sprintf("%f", srv.difficultyFactor))
 
 	// TODO: insert stats/difficulty factor
 	fmt.Fprintf(w, greet)
@@ -176,8 +175,9 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 
 func main() {
 	// TODO: configure from ENV/file
+	difficultyFactor := 0.0
+	storePath := "store"
 	host := ""
-
 	port := 8080
 	envPort := os.Getenv("PORT")
 	if envPort != "" {
@@ -187,7 +187,6 @@ func main() {
 		}
 		port = p
 	}
-	storePath := "store"
 
 	store, err := loadStore(storePath)
 	if err != nil {
@@ -195,7 +194,7 @@ func main() {
 	}
 	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
 
-	srv := &Server{store}
+	srv := &Server{store, difficultyFactor}
 
 	http.HandleFunc("/", srv.handler)
 
