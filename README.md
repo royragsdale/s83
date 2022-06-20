@@ -13,28 +13,37 @@ I'm springing at `db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e12
 
 ## Quick Start/Demo
 
-Build client (`s83`) and server (`s83d`).
+1. Build client (`s83`) and server (`s83d`).
 ```
 $ go build -o bin/s83 ./cmd/client
 $ go build -o bin/s83d ./cmd/server
 $ cd bin
 ```
 
-Make a directory (`store`) for the server to store it's boards, then start server
+2. Make a directory (`store`) for the server to store it's boards, then start server
 and leave it running in another window.
 ```
 $ mkdir store
 $ ./s83d
 ```
 
-Generate a creator key ("secret"). This may take a few minutes to get lucky.
+3. Generate a creator key ("secret"). This may take a few minutes to get lucky.
 ```
 $ ./s83 new
 ```
 
-Add the keys you just generated to your client configuration and set the server
-to point at your local server like so. Aside from the simple `key = value` lines
-this attempts to conform to the "Springfile" convention.
+4. Add your keys to a "profile"
+
+_You can have multiple profiles and switch between them with `./s38 -c PROFILE`_
+
+Add the keys you just generated to your client profile and set the server to
+point at your local server like below.
+
+Aside from the simple `key = value` lines this attempts to conform to the
+"Springfile" convention so you can add a list of the boards you would like to
+follow, optionally preceded by a _handle_ for how you would like to track that
+board (`me` in this example).
+
 `~/.config/s83/default`
 ```
 secret = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -44,12 +53,13 @@ me
 http://localhost:8080/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
 ```
 
-Verify you can reach your server by getting the ever-changing test board.
+5. Verify you can reach your server by getting the ever-changing test board.
 ```
 $ ./s83 get ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583
 ```
 
-Make a board and publish it to the world!
+6. Make a board and publish it (don't worry this is just to your local test
+   server)!
 ```
 $ echo "<h1>It's Alive</h1>" > board.html
 
@@ -57,12 +67,24 @@ $ ./s83 pub board.html
 [info] Success
 ```
 
-Check out your great work (use _your_ public creator key).
+7. Assuming you added your key to your configuration you can check out your great
+work with a simple `get` which will fetch all of your configured/followed boards.
 ```
-$ ./s83 get db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
+$ ./s83 get
+```
+
+At this point the client only fetches the raw boards, so you can list/view them
+however is convenient:
+```
+$ ls ~/.config/s83/data/default/*
+$ cat ~/.config/s83/data/default/*
 ```
 
 Enjoy!
+
+Some public servers you can publish boards to are:
+- [https://bogbody.biz](https://bogbody.biz)
+- [https://0l0.lol/](https://0l0.lol/)
 
 ## Current Limitations
 
@@ -75,7 +97,6 @@ implemented. A non-exhaustive list of missing features follows.
 	- potentially imprecise error messages
 - client
 	- no "realms"
-	- no list of multiple subscriptions (e.g. get a single board at a time)
 	- plaintext only, no DOM/CSP/Formatting
 - Tests
 
