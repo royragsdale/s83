@@ -2,6 +2,7 @@ package s83
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
@@ -39,18 +40,47 @@ func genCreator() (Creator, error) {
 	return Creator{priv, Publisher{pub}}, err
 }
 
-func NewCreator() (Creator, int, error) {
+type CreatorResult struct {
+	Creator Creator
+	Count   int
+	Err     error
+}
+
+func cancelableNewCreator(out chan *CreatorResult, ctx context.Context) {
 	var err error
 	cnt := 0
 	c := Creator{}
 	for !c.Publisher.valid() {
-		c, err = genCreator()
-		if err != nil {
-			return c, cnt, err
+		select {
+		case <-ctx.Done():
+			out <- &CreatorResult{c, cnt, errors.New("canceled")}
+			return
+		default:
+			c, err = genCreator()
+			if err != nil {
+				break
+			}
+			cnt += 1
 		}
-		cnt += 1
 	}
-	return c, cnt, nil
+	out <- &CreatorResult{c, cnt, err}
+}
+
+func NewCreator(j int) CreatorResult {
+	out := make(chan *CreatorResult)
+	ctx, cancel := context.WithCancel(context.Background())
+	for i := 0; i < j; i++ {
+		go cancelableNewCreator(out, ctx)
+	}
+	// block and wait for a winner
+	creatorResult := <-out
+	cancel()
+	for i := 0; i < j-1; i++ {
+		lostResult := <-out
+		creatorResult.Count += lostResult.Count
+	}
+
+	return *creatorResult
 }
 
 func NewCreatorFromKey(privateKeyHex string) (Creator, error) {

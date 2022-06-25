@@ -25,6 +25,7 @@ func main() {
 	// New creator
 	// TODO: add flags for, difficulty, check existence
 	newCmd := flag.NewFlagSet("new", flag.ExitOnError)
+	var jFlag = newCmd.Int("j", 1, "number of miners to run concurrently")
 
 	// Display configuration information (e.g. which "profile") is in use
 	whoCmd := flag.NewFlagSet("who", flag.ExitOnError)
@@ -83,7 +84,7 @@ func main() {
 
 	case "new":
 		newCmd.Parse(subArgs)
-		config.New()
+		config.New(*jFlag)
 
 	case "who":
 		whoCmd.Parse(subArgs)
@@ -127,26 +128,26 @@ func main() {
 	}
 }
 
-func (config Config) New() {
-	fmt.Println("[info] Generating a new creator key. Please be patient.")
+func (config Config) New(j int) {
+	fmt.Printf("[info] Generating a new creator key with %d miners. Please be patient.\n", j)
 	start := time.Now()
 
 	// actually generate the new creator
-	creator, cnt, err := s83.NewCreator()
-	if err != nil {
-		log.Fatal(err)
+	c := s83.NewCreator(j)
+	if c.Err != nil {
+		log.Fatal(c.Err)
 	}
 	// compute mildly interesting stats
 	t := time.Now()
 	elapsed := t.Sub(start).Seconds()
-	kps := int(float64(cnt) / elapsed)
+	kps := int(float64(c.Count) / elapsed)
 
 	// display results
-	fmt.Printf("[info] Success! Found a valid key in %d iterations over %d seconds (%d kps)\n", cnt, int(elapsed), kps)
+	fmt.Printf("[info] Success! Found a valid key in %d iterations over %d seconds (%d kps)\n", c.Count, int(elapsed), kps)
 	fmt.Println("[info] The public key is your creator id. Share it!")
 	fmt.Println("[WARN] The secret key is SECRET. Do not share it or lose it.")
-	fmt.Println("public:", creator)
-	fmt.Println("secret:", creator.ExportPrivateKey())
+	fmt.Println("public:", c.Creator)
+	fmt.Println("secret:", c.Creator.ExportPrivateKey())
 }
 
 func (config Config) Who() {

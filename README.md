@@ -28,6 +28,8 @@ $ ./s83d
 ```
 
 3. Generate a creator key ("secret"). This may take a few minutes to get lucky.
+   Speed it up with (`-j N`) where `N` is the number of miners to run. Locally
+   I get ~160k attempts per second.
 ```
 $ ./s83 new
 ```
