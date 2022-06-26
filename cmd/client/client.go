@@ -25,17 +25,18 @@ func main() {
 	// New creator
 	// TODO: add flags for, difficulty, check existence
 	newCmd := flag.NewFlagSet("new", flag.ExitOnError)
-	var jFlag = newCmd.Int("j", 1, "number of miners to run concurrently")
+	jFlag := newCmd.Int("j", 1, "number of miners to run concurrently")
 
 	// Display configuration information (e.g. which "profile") is in use
 	whoCmd := flag.NewFlagSet("who", flag.ExitOnError)
 
 	// Publish a board
-	// TODO: add flags to store locally, board on CLI, board from file
 	pubCmd := flag.NewFlagSet("pub", flag.ExitOnError)
 	pubCmd.Usage = func() {
+		// TODO: fix usange to show args
 		fmt.Fprintf(pubCmd.Output(), "usage: pub <path>\n")
 	}
+	dryFlag := pubCmd.Bool("dry", false, "dry run, print board locally instread of publishing")
 
 	// Get boards from a server
 	// TODO: add flags to store, launch browser, set mod time (e.g. from local copy)
@@ -105,13 +106,13 @@ func main() {
 			os.Exit(1)
 		}
 
-		if config.Server == nil {
+		if config.Server == nil && !*dryFlag {
 			fmt.Println("[ERROR] missing server configuration.")
 			fmt.Printf("[info] add a 'server=' line to your config file (%s)\n", config.Path())
 			os.Exit(1)
 		}
 
-		config.Pub(pubCmd.Arg(0))
+		config.Pub(pubCmd.Arg(0), *dryFlag)
 
 	case "get":
 		getCmd.Parse(subArgs)
@@ -154,14 +155,19 @@ func (config Config) Who() {
 	fmt.Print(config)
 }
 
-func (config Config) Pub(path string) {
+func (config Config) Pub(path string, dryRun bool) {
 	data, err := os.ReadFile(path)
 	exitOnError(err)
 
 	board, err := config.Creator.NewBoard(data)
 	exitOnError(err)
 
-	exitOnError(publishBoard(config.Server, board))
+	if !dryRun {
+		exitOnError(publishBoard(config.Server, board))
+	} else {
+		fmt.Println("[info] Success. This board should publish (pending difficulty and TTL checks)")
+		fmt.Println(board)
+	}
 }
 
 func publishBoard(server *url.URL, board s83.Board) error {
@@ -239,6 +245,7 @@ func (config Config) Get(key string) {
 	for _, b := range boards {
 		b.Save(config.DataPath())
 	}
+	// TODO: says sucess even if there are failures
 	fmt.Printf("[info] Success. Saved %d boards to %s\n", len(boards), config.DataPath())
 }
 
