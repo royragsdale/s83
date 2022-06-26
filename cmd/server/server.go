@@ -128,7 +128,8 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	}
 
 	w.Header().Set("Spring-Signature", board.Signature())
-	fmt.Fprintf(w, string(board.Content))
+	// DO NOT "format" board content. It is user supplied.
+	w.Write(board.Content)
 }
 
 func (srv *Server) blocked(key string) bool {

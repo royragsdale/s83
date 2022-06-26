@@ -56,3 +56,6 @@ func TestPutBoardHandler(t *testing.T) {
 	}
 
 }
+
+// TODO: test boards with format string special charachters to ensure we are
+// NEVER formatting board content
