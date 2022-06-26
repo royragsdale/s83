@@ -46,6 +46,7 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// TODO: disagree with SPEC (prevents just normal web browser from opening links)
+	// ref: https://github.com/robinsloan/spring-83-spec/issues/7
 	/*
 		// Check this is an actual Spring-83 client
 		if req.Header.Get("Spring-Version") != s83.SpringVersion {
