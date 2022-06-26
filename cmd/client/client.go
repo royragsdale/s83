@@ -143,8 +143,13 @@ func (config Config) New(j int) {
 	elapsed := t.Sub(start).Seconds()
 	kps := int(float64(c.Count) / elapsed)
 
+	// compute key characteristics
+	strength := c.Creator.Strength()
+	strengthFactor := s83.StrengthFactor(strength)
+
 	// display results
 	fmt.Printf("[info] Success! Found a valid key in %d iterations over %d seconds (%d kps)\n", c.Count, int(elapsed), kps)
+	fmt.Printf("[info] This key passes a difficulty factor of ~%0.3f (strength=%d)\n", strengthFactor, strength)
 	fmt.Println("[info] The public key is your creator id. Share it!")
 	fmt.Println("[WARN] The secret key is SECRET. Do not share it or lose it.")
 	fmt.Println("public:", c.Creator)

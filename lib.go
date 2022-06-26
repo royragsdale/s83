@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 	"regexp"
 	"strconv"
 	"time"
@@ -20,8 +23,7 @@ const SpringVersion = "83"
 
 const KeyLen = 64
 const sigLen = 128
-
-const maxNumBoards = 10_000_000
+const MaxKey uint64 = math.MaxUint64 // 1<<64 - 1 =  (2**64 - 1)
 
 const yearBase = 2000 // update in year 3000
 
@@ -113,6 +115,10 @@ func (c Creator) Valid() bool {
 	return c.Publisher.valid()
 }
 
+func (c Creator) Strength() uint64 {
+	return c.Publisher.Strength()
+}
+
 func timeElem(t time.Time) string {
 	tStr := t.UTC().Format(TimeFormat8601)
 	return fmt.Sprintf(`<time datetime="%s">`, tStr)
@@ -189,6 +195,11 @@ func (p Publisher) valid() bool {
 	return keyStart.Before(now) && keyExpiry.After(now)
 }
 
+func (p Publisher) Strength() uint64 {
+	// The key's first 16 hex characters, interpreted as a 64-bit number
+	return binary.BigEndian.Uint64(p.PublicKey[:8])
+}
+
 type Signature []byte
 
 func (s Signature) String() string {
@@ -242,4 +253,37 @@ func ParseTimestamp(content []byte) (time.Time, error) {
 	}
 
 	// will not reach here
+}
+
+func DifficultyThreshold(dFactor float64) (uint64, error) {
+	// The difficulty factor is a decimal number in the range 0.0 .. 1.0
+	if dFactor < 0.0 || dFactor > 1.0 {
+		return 0, errors.New("Invalid difficulty factor, must be in range 0.0-1.0 (inclusive)")
+	}
+
+	// key_64_threshold = round(MAX_KEY_64 * ( 1.0 - difficulty_factor))
+	// TODO: still required big nums since uint64 overflows float64
+	bigMaxKey := new(big.Float).SetInt(new(big.Int).SetUint64(MaxKey))
+	bigFactor := new(big.Float).Sub(big.NewFloat(1.0), big.NewFloat(dFactor))
+	bigThresh := new(big.Float).Mul(bigMaxKey, bigFactor)
+	threshold, acc := bigThresh.Uint64()
+	if acc != big.Exact {
+		return 0, errors.New("Invalid threshold, should be exactly representable as a uint64")
+	}
+
+	return threshold, nil
+}
+
+func StrengthFactor(keyStrength uint64) float64 {
+
+	bigMaxKey := new(big.Float).SetInt(new(big.Int).SetUint64(MaxKey))
+	bigKeyStrength := new(big.Float).SetInt(new(big.Int).SetUint64(keyStrength))
+	bigPart := new(big.Float).Quo(bigKeyStrength, bigMaxKey)
+	bigFactor := new(big.Float).Sub(big.NewFloat(1.0), bigPart)
+
+	factor, _ := bigFactor.Float64()
+
+	// WARN: accuracy will be inexact, so round strength factor down and cap
+	// precision to ensure the cooresponding threshold applies.
+	return math.Floor(factor*1000) / 1000
 }

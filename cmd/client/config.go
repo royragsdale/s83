@@ -161,7 +161,8 @@ func (config Config) String() string {
 	display += fmt.Sprintf("path    : %s\n", config.Path())
 	display += fmt.Sprintf("server  : %s\n", config.Server)
 	display += fmt.Sprintf("pub     : %s\n", config.Creator)
-	display += fmt.Sprintf("follows :\n")
+	display += fmt.Sprintf("strength: %0.3f\n", s83.StrengthFactor(config.Creator.Strength()))
+	display += fmt.Sprintf("---------\nfollows :\n")
 	for _, follow := range config.Follows {
 		display += fmt.Sprintf("%s\n", follow)
 	}
