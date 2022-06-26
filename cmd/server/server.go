@@ -14,11 +14,12 @@ import (
 )
 
 type Server struct {
-	store            *Store
-	difficultyFactor float64
-	ttl              int // days
-	blockList        map[string]bool
-	creator          s83.Creator
+	store               *Store
+	difficultyFactor    float64
+	difficultyThreshold uint64 // TODO: simplify into Difficulty type to keep in sync
+	ttl                 int    // days
+	blockList           map[string]bool
+	creator             s83.Creator
 }
 
 func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
@@ -163,6 +164,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 		return
 	}
 
+	skipDifficultyCheck := false
 	existingBoard, err := srv.store.boardFromKey(key)
 	// there was a valid existing board
 	if err == nil {
@@ -170,6 +172,8 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 			http.Error(w, "409 - Submission older than existing board", http.StatusConflict)
 			return
 		}
+		// existing boards are grandfathered
+		skipDifficultyCheck = true
 	}
 
 	// reject boards older than TTL
@@ -178,8 +182,12 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 		return
 	}
 
-	// TODO: check difficulty factor
-	// 403: Board was submitted for a key that does not meet the difficulty factor.
+	// check difficulty
+	if !skipDifficultyCheck && board.Publisher.Strength() >= srv.difficultyThreshold {
+		http.Error(w, "403: Board was submitted for a key that does not meet the difficulty factor", http.StatusForbidden)
+		return
+
+	}
 
 	err = srv.store.saveBoard(board)
 	if err != nil {
@@ -221,8 +229,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// pre compute difficultyThreshold
+	threshold, err := s83.DifficultyThreshold(difficultyFactor)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// TODO: NewServer(store)
-	srv := &Server{store, difficultyFactor, ttl, blockList, creator}
+	srv := &Server{store, difficultyFactor, threshold, ttl, blockList, creator}
 
 	http.HandleFunc("/", srv.handler)
 

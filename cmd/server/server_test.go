@@ -39,7 +39,7 @@ func TestPutBoardHandler(t *testing.T) {
 		t.Fatalf(`An empty directory store should be valid: %v`, err)
 	}
 	blockList := map[string]bool{s83.TestPublic: true, dateToKey(time.Now()): true}
-	srv := &Server{store, 0.0, 22, blockList, s83.Creator{}}
+	srv := &Server{store, 0.0, s83.MaxKey, 22, blockList, s83.Creator{}}
 
 	// test blocklist
 	for key, _ := range blockList {
