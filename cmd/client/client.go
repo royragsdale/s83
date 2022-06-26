@@ -166,6 +166,7 @@ func (config Config) Pub(path string, dryRun bool) {
 		exitOnError(publishBoard(config.Server, board))
 	} else {
 		fmt.Println("[info] Success. This board should publish (pending difficulty and TTL checks)")
+		fmt.Println("[info] Size: ", len(board.Content))
 		fmt.Println(board)
 	}
 }
@@ -233,11 +234,13 @@ func (config Config) Get(key string) {
 		follows = []s83.Follow{f}
 	}
 
+	errCnt := 0
 	boards := []s83.Board{}
 	for _, f := range follows {
 		b, err := f.GetBoard()
 		if err != nil {
 			fmt.Printf("[warn] failed to get board for %s: %v\n", f, err)
+			errCnt += 1
 			continue
 		}
 		boards = append(boards, b)
@@ -245,8 +248,13 @@ func (config Config) Get(key string) {
 	for _, b := range boards {
 		b.Save(config.DataPath())
 	}
-	// TODO: says sucess even if there are failures
-	fmt.Printf("[info] Success. Saved %d boards to %s\n", len(boards), config.DataPath())
+	if errCnt == 0 {
+		fmt.Printf("[info] Success. Saved %d boards to %s\n", len(boards), config.DataPath())
+	} else if errCnt == len(follows) {
+		exitOnError(errors.New("Failed to get any boards"))
+	} else {
+		fmt.Printf("[warn] Failed to get %d/%d boards\n", errCnt, len(follows))
+	}
 }
 
 func exitOnError(err error) {
