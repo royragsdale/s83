@@ -57,6 +57,8 @@ func (b Board) After(ts time.Time) bool {
 func (b Board) Save(dir string) error {
 	path := filepath.Join(dir, fmt.Sprintf("%s.s83", b.Publisher.String()))
 	data := append([]byte(b.Signature()+"\n"), b.Content...)
+	// TODO: move actual write out to client, maybe move the whole thing out.
+	// the goal was to make the client and server data stores similar.
 	return os.WriteFile(path, data, 0600)
 }
 

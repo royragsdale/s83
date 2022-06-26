@@ -126,11 +126,17 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 	// TODO: other checks of validity (e.g. lazy TTL expiration)
 	if !board.VerifySignature() {
+		log.Println("loaded board with a failed signature", board)
 		http.Error(w, "500 - Bad board", http.StatusInternalServerError)
 		return
 	}
 
-	// TODO: check/compare mod time
+	if srv.boardExpired(board) {
+		log.Println("removing exipred board", board.Publisher)
+		srv.store.removeBoard(board)
+		http.Error(w, "404 - Board not found", http.StatusNotFound)
+		return
+	}
 
 	w.Header().Set("Spring-Signature", board.Signature())
 	fmt.Fprintf(w, string(board.Content))
@@ -139,6 +145,10 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 func (srv *Server) blocked(key string) bool {
 	_, blocked := srv.blockList[key]
 	return blocked
+}
+
+func (srv *Server) boardExpired(board s83.Board) bool {
+	return !board.After(time.Now().UTC().AddDate(0, 0, -srv.ttl))
 }
 
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
@@ -169,7 +179,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	}
 
 	// reject boards older than TTL
-	if !board.After(time.Now().UTC().AddDate(0, 0, -srv.ttl)) {
+	if srv.boardExpired(board) {
 		http.Error(w, "409 - Submission older than server TTL", http.StatusConflict)
 		return
 	}

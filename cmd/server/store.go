@@ -70,6 +70,14 @@ func (s *Store) keyToPath(key string) string {
 	return filepath.Join(s.Dir, fmt.Sprintf("%s.s83", key))
 }
 
-func (s *Store) saveBoard(board s83.Board) error {
-	return board.Save(s.Dir)
+func (s *Store) boardPath(b s83.Board) string {
+	return filepath.Join(s.Dir, fmt.Sprintf("%s.s83", b.Publisher.String()))
+}
+
+func (s *Store) saveBoard(b s83.Board) error {
+	return b.Save(s.Dir)
+}
+
+func (s *Store) removeBoard(b s83.Board) error {
+	return os.Remove(s.boardPath(b))
 }
