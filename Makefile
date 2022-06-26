@@ -34,7 +34,7 @@ clean:
 	rm -f ${BIN}/${COVER}
 	rm -f ${BIN}/${COVERHTML}
 
-docker-build: docker-build-server
+docker-build: test docker-build-server
 
 docker-build-server:
 	docker build -t ${SERVERTAG} -f Dockerfile.server .
