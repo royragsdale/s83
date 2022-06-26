@@ -35,12 +35,6 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Spring-Version", s83.SpringVersion)
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
 
-	// Check this is an actual Spring-83 client
-	if req.Header.Get("Spring-Version") != s83.SpringVersion {
-		http.Error(w, "400 - Invalid Spring-Version", http.StatusBadRequest)
-		return
-	}
-
 	// GET / ("homepage"/difficulty)
 	if req.URL.Path == "/" {
 		if req.Method != http.MethodGet {
@@ -50,6 +44,15 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 		srv.handleDifficulty(w, req)
 		return
 	}
+
+	// TODO: disagree with SPEC (prevents just normal web browser from opening links)
+	/*
+		// Check this is an actual Spring-83 client
+		if req.Header.Get("Spring-Version") != s83.SpringVersion {
+			http.Error(w, "400 - Invalid Spring-Version", http.StatusBadRequest)
+			return
+		}
+	*/
 
 	// GET/PUT /<key> (boards)
 	reKey := regexp.MustCompile(`^\/([0-9A-Fa-f]{64}?)$`)
