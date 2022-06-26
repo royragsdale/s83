@@ -18,6 +18,7 @@ type Server struct {
 	difficultyFactor float64
 	ttl              int // days
 	blockList        map[string]bool
+	creator          s83.Creator
 }
 
 func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
@@ -95,22 +96,11 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 	// special case
 	// "an ever-changing board...with a timestamp set to the time of the request."
-	// TODO: clarify if this is the time as received, or the time per some header
 	if key == s83.TestPublic {
-
-		// TODO: create once per server and store in a context
-		creator, err := s83.NewCreatorFromKey(s83.TestPrivate)
-		if err != nil {
-			http.Error(w, "500 - Failed generating creator", http.StatusInternalServerError)
-			return
-		}
-
-		// create an interesting board
 		rand.Seed(time.Now().Unix())
 		randMsg := magic8Ball[rand.Intn(len(magic8Ball))]
 		content := fmt.Sprintf(testBoard, randMsg)
-
-		board, err = creator.NewBoard([]byte(content))
+		board, err = srv.creator.NewBoard([]byte(content))
 		if err != nil {
 			http.Error(w, "500 - Failed generating board", http.StatusInternalServerError)
 			return
@@ -124,7 +114,6 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 		}
 	}
 
-	// TODO: other checks of validity (e.g. lazy TTL expiration)
 	if !board.VerifySignature() {
 		log.Println("loaded board with a failed signature", board)
 		http.Error(w, "500 - Bad board", http.StatusInternalServerError)
@@ -221,8 +210,14 @@ func main() {
 	}
 	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
 
+	// creator for the test key board
+	creator, err := s83.NewCreatorFromKey(s83.TestPrivate)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// TODO: NewServer(store)
-	srv := &Server{store, difficultyFactor, ttl, blockList}
+	srv := &Server{store, difficultyFactor, ttl, blockList, creator}
 
 	http.HandleFunc("/", srv.handler)
 
