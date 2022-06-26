@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,10 +14,18 @@ import (
 	"github.com/royragsdale/s83"
 )
 
+// utility functions for tests
 func dateToKey(t time.Time) string {
 	stub := strings.Repeat("a", s83.KeyLen-7) // must be hex char
 	prefix := "83e"                           // valid prefix
 	return fmt.Sprintf("%s%s%02d%s", stub, prefix, int(t.Month()), strconv.Itoa(t.Year())[2:])
+}
+
+func testServer(t *testing.T) *Server {
+	// set up a server with a clean store
+	dir := t.TempDir()
+	os.Setenv(envStore, dir)
+	return NewServerFromEnv()
 }
 
 func NewRequest(method string, url string, body io.Reader, t *testing.T) *http.Request {
@@ -32,14 +41,9 @@ func NewRequest(method string, url string, body io.Reader, t *testing.T) *http.R
 
 func TestPutBoardHandler(t *testing.T) {
 
-	// TODO: add utility function to set up test store
-	dir := t.TempDir()
-	store, err := loadStore(dir)
-	if err != nil {
-		t.Fatalf(`An empty directory store should be valid: %v`, err)
-	}
 	blockList := map[string]bool{s83.TestPublic: true, dateToKey(time.Now()): true}
-	srv := &Server{store, 0.0, s83.MaxKey, 22, blockList, s83.Creator{}}
+	srv := testServer(t)
+	srv.blockList = blockList
 
 	// test blocklist
 	for key, _ := range blockList {

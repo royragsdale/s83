@@ -1,25 +1,19 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/royragsdale/s83"
 )
 
-type Server struct {
-	store               *Store
-	difficultyFactor    float64
-	difficultyThreshold uint64 // TODO: simplify into Difficulty type to keep in sync
-	ttl                 int    // days
-	blockList           map[string]bool
-	creator             s83.Creator
+func (srv *Server) address() string {
+	return fmt.Sprintf("%s:%d", srv.host, srv.port)
 }
 
 func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
@@ -201,48 +195,16 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 }
 
 func main() {
-	// TODO: configure from ENV/file
-	blockList := map[string]bool{s83.TestPublic: true}
-	difficultyFactor := 0.0
-	ttl := 22
-	storePath := "store"
-	host := ""
-	port := 8080
-	envPort := os.Getenv("PORT")
-	if envPort != "" {
-		p, err := strconv.Atoi(envPort)
-		if err != nil {
-			log.Fatalf("failed parsing PORT: %v\n", err)
-		}
-		port = p
-	}
+	// support just the default -h/--help to describe the environment variables supported
+	flag.Usage = envUsage
+	flag.Parse()
 
-	store, err := loadStore(storePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
-
-	// creator for the test key board
-	creator, err := s83.NewCreatorFromKey(s83.TestPrivate)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// pre compute difficultyThreshold
-	threshold, err := s83.DifficultyThreshold(difficultyFactor)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// TODO: NewServer(store)
-	srv := &Server{store, difficultyFactor, threshold, ttl, blockList, creator}
+	srv := NewServerFromEnv()
 
 	http.HandleFunc("/", srv.handler)
 
-	addr := fmt.Sprintf("%s:%d", host, port)
-	log.Printf("server started on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Printf("starting server on %s", srv.address())
+	log.Fatal(http.ListenAndServe(srv.address(), nil))
 }
 
 const greet = `<!DOCTYPE html>
