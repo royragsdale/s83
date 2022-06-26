@@ -4,6 +4,9 @@ SERVER=s83d
 COVER=cover.out
 COVERHTML=cover.html
 
+# docker
+SERVERTAG=s83/server
+
 all: test build
 
 test:
@@ -30,3 +33,11 @@ clean:
 	rm -f ${BIN}/${SERVER}
 	rm -f ${BIN}/${COVER}
 	rm -f ${BIN}/${COVERHTML}
+
+docker-build: docker-build-server
+
+docker-build-server:
+	docker build -t ${SERVERTAG} -f Dockerfile.server .
+
+docker-serve: docker-build-server
+	docker run --rm -it -p 8080:8080 ${SERVERTAG}

@@ -1,0 +1,27 @@
+# 1. build binary
+FROM golang:1.18 AS builder
+
+WORKDIR /src
+
+# copy in dependencies first for caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# copy in full source
+COPY . .
+
+# build with CG0_ENABLED=0 to allow scratch container (e.g. no libc)
+RUN CGO_ENABLED=0 go build -o s83d cmd/server/*
+
+# default data store
+RUN mkdir /store
+
+
+# 2. final image
+# TODO: non-root user
+FROM scratch
+
+COPY --from=builder /src/s83d  /s83d
+COPY --from=builder /store  /store
+
+ENTRYPOINT ["/s83d"]

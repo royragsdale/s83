@@ -107,6 +107,22 @@ and solidifies. The primary purpose at this point is to explore the corners of
 spec, provide friendly comment, and have a good time implementing something
 cool.
 
+## WIP: Deployment
+
+**work in progress**
+
+There is a [Dockerfile](Dockerfile.server) provided for packaging up the server.
+Once things reach a level of stability/release this will get published, but for
+now you can build/test locally.
+
+The `Makefile` provides some convenience functions` to spin up an ephemeral test
+instance.
+
+```
+make docker-build
+make docker-serve
+```
+
 ## Design Decisions
 
 - server
