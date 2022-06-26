@@ -44,8 +44,12 @@ func (b Board) Signature() string {
 	return b.signature.String()
 }
 
-func (b Board) After(other Board) bool {
+func (b Board) AfterBoard(other Board) bool {
 	return b.timestamp.After(other.timestamp)
+}
+
+func (b Board) After(ts time.Time) bool {
+	return b.timestamp.After(ts)
 }
 
 // TODO: this clobbers old files, which matches the ephemeral nature of the protocol

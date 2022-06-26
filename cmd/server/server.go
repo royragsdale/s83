@@ -16,6 +16,7 @@ import (
 type Server struct {
 	store            *Store
 	difficultyFactor float64
+	ttl              int // days
 	blockList        map[string]bool
 }
 
@@ -142,7 +143,6 @@ func (srv *Server) blocked(key string) bool {
 
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
-	// TODO: blocklist
 	if srv.blocked(key) {
 		http.Error(w, "401 - Unauthorized", http.StatusUnauthorized)
 	}
@@ -162,14 +162,20 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	existingBoard, err := srv.store.boardFromKey(key)
 	// there was a valid existing board
 	if err == nil {
-		if !board.After(existingBoard) {
+		if !board.AfterBoard(existingBoard) {
 			http.Error(w, "409 - Submission older than existing board", http.StatusConflict)
 			return
 		}
-	} else {
-		// TODO: check difficulty factor
-		// 403: Board was submitted for a key that does not meet the difficulty factor.
 	}
+
+	// reject boards older than TTL
+	if !board.After(time.Now().UTC().AddDate(0, 0, -srv.ttl)) {
+		http.Error(w, "409 - Submission older than server TTL", http.StatusConflict)
+		return
+	}
+
+	// TODO: check difficulty factor
+	// 403: Board was submitted for a key that does not meet the difficulty factor.
 
 	err = srv.store.saveBoard(board)
 	if err != nil {
@@ -186,6 +192,7 @@ func main() {
 	// TODO: configure from ENV/file
 	blockList := map[string]bool{s83.TestPublic: true}
 	difficultyFactor := 0.0
+	ttl := 22
 	storePath := "store"
 	host := ""
 	port := 8080
@@ -204,7 +211,8 @@ func main() {
 	}
 	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
 
-	srv := &Server{store, difficultyFactor, blockList}
+	// TODO: NewServer(store)
+	srv := &Server{store, difficultyFactor, ttl, blockList}
 
 	http.HandleFunc("/", srv.handler)
 
