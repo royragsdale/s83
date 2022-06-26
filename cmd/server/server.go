@@ -16,6 +16,7 @@ import (
 type Server struct {
 	store            *Store
 	difficultyFactor float64
+	blockList        map[string]bool
 }
 
 func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
@@ -134,9 +135,17 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	fmt.Fprintf(w, string(board.Content))
 }
 
+func (srv *Server) blocked(key string) bool {
+	_, blocked := srv.blockList[key]
+	return blocked
+}
+
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
 	// TODO: blocklist
+	if srv.blocked(key) {
+		http.Error(w, "401 - Unauthorized", http.StatusUnauthorized)
+	}
 
 	// Validate Board (size, signature, timestamp)
 	board, err := s83.BoardFromHTTP(key, req.Header.Get("Spring-Signature"), req.Body)
@@ -175,6 +184,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 
 func main() {
 	// TODO: configure from ENV/file
+	blockList := map[string]bool{s83.TestPublic: true}
 	difficultyFactor := 0.0
 	storePath := "store"
 	host := ""
@@ -194,7 +204,7 @@ func main() {
 	}
 	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
 
-	srv := &Server{store, difficultyFactor}
+	srv := &Server{store, difficultyFactor, blockList}
 
 	http.HandleFunc("/", srv.handler)
 

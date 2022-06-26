@@ -49,7 +49,7 @@ func TestLoadingFromTestKeys(t *testing.T) {
 }
 
 func dateToKey(t time.Time) string {
-	stub := strings.Repeat("a", keyLen-7) // must be hex char
+	stub := strings.Repeat("a", KeyLen-7) // must be hex char
 	prefix := "83e"                       // valid prefix
 	return fmt.Sprintf("%s%s%02d%s", stub, prefix, int(t.Month()), strconv.Itoa(t.Year())[2:])
 }
@@ -73,7 +73,7 @@ func TestKeyValidity(t *testing.T) {
 	yr2 := dateToKey(cur.AddDate(2, 0, 0))
 
 	// invalid
-	badPrefix := strings.Repeat("a", keyLen-4) + yr1[keyLen-4:]
+	badPrefix := strings.Repeat("a", KeyLen-4) + yr1[KeyLen-4:]
 	prevM := dateToKey(cur.AddDate(0, -1, 0)) // expired
 	yr2m1 := dateToKey(cur.AddDate(2, 1, 0))  // not yet valid
 
@@ -123,7 +123,7 @@ func TestBoardCreation(t *testing.T) {
 	}
 
 	if len(board.Signature()) != sigLen {
-		t.Errorf("Signature should be %d long", keyLen)
+		t.Errorf("Signature should be %d long", KeyLen)
 	}
 
 	// force invalid signature
@@ -164,8 +164,8 @@ func TestStringFormats(t *testing.T) {
 
 	keys := []string{creator.String(), creator.ExportPrivateKey(), creator.Publisher.String()}
 	for _, key := range keys {
-		if len(key) != keyLen {
-			t.Errorf("Creator should be %d long", keyLen)
+		if len(key) != KeyLen {
+			t.Errorf("Creator should be %d long", KeyLen)
 		}
 
 		_, err = hex.DecodeString(key)

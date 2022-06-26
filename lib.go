@@ -18,7 +18,7 @@ import (
 // SpringVersion for use in http headers
 const SpringVersion = "83"
 
-const keyLen = 64
+const KeyLen = 64
 const sigLen = 128
 
 const maxNumBoards = 10_000_000
@@ -84,7 +84,7 @@ func NewCreator(j int) CreatorResult {
 }
 
 func NewCreatorFromKey(privateKeyHex string) (Creator, error) {
-	if len(privateKeyHex) != keyLen {
+	if len(privateKeyHex) != KeyLen {
 		return Creator{}, errors.New("Invalid key length")
 	}
 	// "crypto/ed2551's private key representation includes a public key suffix...
@@ -144,7 +144,7 @@ type Publisher struct {
 }
 
 func NewPublisherFromKey(publicKeyHex string) (Publisher, error) {
-	if len(publicKeyHex) != keyLen {
+	if len(publicKeyHex) != KeyLen {
 		return Publisher{}, errors.New("Invalid key length")
 	}
 	publicKey, err := hex.DecodeString(publicKeyHex)
@@ -169,13 +169,13 @@ func (p Publisher) valid() bool {
 
 	// the key is only valid in the two years preceding it,
 	// and expires at the end of the last day of the month specified
-	yearStr := p.String()[keyLen-2:]
+	yearStr := p.String()[KeyLen-2:]
 	keyYear, err := strconv.Atoi(yearStr)
 	if err != nil {
 		return false
 	}
 
-	monthStr := p.String()[keyLen-4 : keyLen-2]
+	monthStr := p.String()[KeyLen-4 : KeyLen-2]
 	keyMonth, err := strconv.Atoi(monthStr)
 	if err != nil {
 		return false
