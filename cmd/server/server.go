@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/mail"
 	"regexp"
 	"time"
 
@@ -120,9 +121,20 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	}
 
 	if srv.boardExpired(board) {
-		log.Println("removing exipred board", board.Publisher)
+		log.Println("removing expired board", board.Publisher)
 		srv.store.removeBoard(board)
 		http.Error(w, "404 - Board not found", http.StatusNotFound)
+		return
+	}
+
+	// <date and time in UTC, RFC 5322 format> TODO: ???
+	modTimeStr := req.Header.Get("If-Modified-Since")
+	modTime, err := mail.ParseDate(modTimeStr)
+	if err == nil && !board.After(modTime) {
+		// TODO: improve logging
+		// parsed a header and board is not newer than the request. Not Modified.
+		log.Printf("304 - board (%s) not newer than request (%s)\n", board.Timestamp(), modTimeStr)
+		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 

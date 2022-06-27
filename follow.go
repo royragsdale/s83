@@ -32,7 +32,11 @@ func (f Follow) String() string {
 	return fmt.Sprintf("%s %s @ %s", f.publisher, f.handle, f.url.Host)
 }
 
-func (f Follow) GetBoard() (Board, error) {
+func (f Follow) Key() string {
+	return f.publisher.String()
+}
+
+func (f Follow) GetBoard(modTimeStr string) (Board, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", f.url.String(), nil)
 	if err != nil {
@@ -41,8 +45,9 @@ func (f Follow) GetBoard() (Board, error) {
 
 	// set headers
 	req.Header.Set("Spring-Version", SpringVersion)
-	// TODO: optional
-	//req.Header.Set("If-Modified-Since", time.Now().UTC().Format(http.TimeFormat))
+	if modTimeStr != "" {
+		req.Header.Set("If-Modified-Since", modTimeStr)
+	}
 
 	// make request
 	res, err := client.Do(req)

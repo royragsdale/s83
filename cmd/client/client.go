@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/royragsdale/s83"
@@ -242,17 +244,35 @@ func (config Config) Get(key string) {
 	errCnt := 0
 	boards := []s83.Board{}
 	for _, f := range follows {
-		b, err := f.GetBoard()
+		// default to omit modified time header
+		modTimeStr := ""
+
+		// local local copy (if exists)
+		localBoard, err := s83.BoardFromPath(config.followToPath(f))
+		if err == nil {
+			// get our copy of the timestamp (only want boards newer than this)
+			modTimeStr = localBoard.Timestamp()
+		}
+
+		// fetch board from server
+		b, err := f.GetBoard(modTimeStr)
 		if err != nil {
-			fmt.Printf("[warn] failed to get board for %s: %v\n", f, err)
-			errCnt += 1
+			// TODO: improve error handling, actual checks not string inference
+			if strings.Contains(err.Error(), "304 Not Modified") {
+				fmt.Printf("[info] 304 - no new board for %s\n", f)
+			} else {
+				fmt.Printf("[warn] failed to get board for %s: %v\n", f, err)
+				errCnt += 1
+			}
 			continue
 		}
+
+		// save to disk
+		b.Save(config.DataPath())
 		boards = append(boards, b)
 	}
-	for _, b := range boards {
-		b.Save(config.DataPath())
-	}
+
+	// output results message
 	if errCnt == 0 {
 		fmt.Printf("[info] Success. Saved %d boards to %s\n", len(boards), config.DataPath())
 	} else if errCnt == len(follows) {
@@ -260,6 +280,10 @@ func (config Config) Get(key string) {
 	} else {
 		fmt.Printf("[warn] Failed to get %d/%d boards\n", errCnt, len(follows))
 	}
+}
+
+func (config Config) followToPath(f s83.Follow) string {
+	return filepath.Join(config.DataPath(), fmt.Sprintf("%s.s83", f.Key()))
 }
 
 func exitOnError(err error) {
