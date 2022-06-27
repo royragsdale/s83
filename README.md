@@ -123,6 +123,23 @@ make docker-build
 make docker-serve
 ```
 
+You can configure the server by setting enviornment variables:
+
+```
+./bin/s83d -h
+Usage: s83d is designed to be configured using environment variables.
+
+For example: `PORT=8383 ./s83d`
+
+variable         default
+--------         -------
+HOST
+PORT             8080
+STORE            store
+TTL              22
+DIFFICULTY       0.0
+```
+
 ## Design Decisions
 
 - server
