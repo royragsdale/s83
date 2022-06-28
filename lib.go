@@ -121,7 +121,7 @@ func (c Creator) Strength() uint64 {
 
 func timeElem(t time.Time) string {
 	tStr := t.UTC().Format(TimeFormat8601)
-	return fmt.Sprintf(`<time datetime="%s">`, tStr)
+	return fmt.Sprintf(`<time datetime="%s"></time>`, tStr)
 }
 
 func (c Creator) NewBoard(content []byte) (Board, error) {
