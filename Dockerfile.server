@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # build with CG0_ENABLED=0 to allow scratch container (e.g. no libc)
-RUN CGO_ENABLED=0 go build -o s83d cmd/server/*
+RUN CGO_ENABLED=0 go build -o s83d ./cmd/server/...
 
 # default data store
 RUN mkdir /store
