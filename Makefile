@@ -20,10 +20,10 @@ cover:
 build: build-client build-server
 
 build-client:
-	go build -o ${BIN}/${CLIENT} cmd/client/*
+	go build -o ${BIN}/${CLIENT} ./cmd/client/...
 
 build-server:
-	go build -o ${BIN}/${SERVER} cmd/server/*
+	go build -o ${BIN}/${SERVER} ./cmd/server/...
 
 serve: build-server
 	cd ${BIN}; mkdir -p store; ./${SERVER}

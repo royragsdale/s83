@@ -15,7 +15,7 @@ import (
 	"unicode/utf8"
 )
 
-const maxBoardLen = 2217
+const MaxBoardLen = 2217
 
 type Board struct {
 	Publisher Publisher
@@ -75,7 +75,7 @@ func NewBoard(key string, sig Signature, content []byte) (Board, error) {
 		return Board{}, errors.New("Invalid Board: not UTF-8")
 	}
 	// validate size requirement
-	if len(content) > maxBoardLen {
+	if len(content) > MaxBoardLen {
 		return Board{}, errors.New("Invalid Board: too large")
 	}
 	board.Content = content

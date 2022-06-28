@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
@@ -81,12 +82,53 @@ func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type indexData struct {
+	Title      string
+	Admin      *s83.Publisher
+	NumBoards  int
+	TTL        int
+	Difficulty float64
+}
+
 func (srv *Server) handleDifficulty(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Spring-Difficulty", fmt.Sprintf("%f", srv.difficultyFactor))
 
-	// TODO: insert stats/difficulty factor
-	fmt.Fprintf(w, greet)
+	data := indexData{
+		srv.title,
+		srv.admin,
+		srv.store.NumBoards,
+		srv.ttl,
+		srv.difficultyFactor,
+	}
+
+	srv.templates.ExecuteTemplate(w, tIndex, data)
+}
+
+type testData struct {
+	Color   string
+	Message string
+	Time    string
+}
+
+func (srv *Server) testBoard() (s83.Board, error) {
+	// get some fun randomness
+	rand.Seed(time.Now().Unix())
+	randMsg := magic8Ball[rand.Intn(len(magic8Ball))]
+	randColor := colors[rand.Intn(len(colors))]
+	data := testData{randColor, randMsg, time.Now().UTC().Format(time.RFC1123)}
+
+	// execute template
+	var buf bytes.Buffer
+	content := make([]byte, s83.MaxBoardLen)
+	srv.templates.ExecuteTemplate(&buf, tTest, data)
+	n, err := buf.Read(content)
+	if err != nil {
+		return s83.Board{}, err
+	}
+
+	// create a board from it
+	return srv.testCreator.NewBoard(content[:n])
 
 }
 
@@ -97,11 +139,10 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	// special case
 	// "an ever-changing board...with a timestamp set to the time of the request."
 	if key == s83.TestPublic {
-		rand.Seed(time.Now().Unix())
-		randMsg := magic8Ball[rand.Intn(len(magic8Ball))]
-		content := fmt.Sprintf(testBoard, randMsg)
-		board, err = srv.creator.NewBoard([]byte(content))
+
+		board, err = srv.testBoard()
 		if err != nil {
+			log.Println("500: failed creating test board:", err)
 			http.Error(w, "500 - Failed generating board", http.StatusInternalServerError)
 			return
 		}
@@ -219,18 +260,6 @@ func main() {
 	log.Fatal(http.ListenAndServe(srv.address(), nil))
 }
 
-const greet = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>s83d</title>
-</head>
-<body>
- <h1>&lt;arbitrary HTML greeting&gt;></h1>
-</body>
-</html>
-`
-
 const testBoard = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -243,26 +272,3 @@ const testBoard = `<!DOCTYPE html>
 </body>
 </html>
 `
-
-var magic8Ball = []string{
-	"It is certain.",
-	"It is decidedly so.",
-	"Without a doubt.",
-	"Yes definitely.",
-	"You may rely on it.",
-	"As I see it, yes.",
-	"Most likely.",
-	"Outlook good.",
-	"Yes.",
-	"Signs point to yes.",
-	"Reply hazy, try again.",
-	"Ask again later.",
-	"Better not tell you now.",
-	"Cannot predict now.",
-	"Concentrate and ask again.",
-	"Don't count on it.",
-	"My reply is no.",
-	"My sources say no.",
-	"Outlook not so good.",
-	"Very doubtful. ",
-}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <style type="text/css">
+        body {
+            margin: 20px auto;
+            max-width:650px;
+            line-height:1.6;
+            font-size:18px;
+            color:#444;
+            padding:0 10px;
+        }
+        h1,h2,h3{line-height:1.2}
+        table {min-width: 300px;}
+        table, th, td {
+            border: 1px solid black;
+            padding: 5px;
+            width:52%;
+        }
+        iframe {
+            aspect-ratio: 1.41 / 1;
+            height: 52%;
+            width: 52%;
+            min-width: 300px;
+        }
+    </style>
+    <title>{{.Title}}</title>
+</head>
+<body>
+    <h1>A Spring '83 Server</h1>
+
+    <table>
+        <tr><td>Boards</td><td>{{.NumBoards}}</td></tr>
+        <tr><td>Difficulty</td><td>{{.Difficulty}}</td></tr>
+        <tr><td>TTL (days)</td><td>{{.TTL}}</td></tr>
+    </table>
+
+    {{if .Admin}}
+    <h2><a href=/{{.Admin}}>Admin Board</a></h2>
+    <iframe src="/{{.Admin}}" title="Admin Board"></iframe>
+    {{end}}
+
+    <h2>Everchanging Test Board</h2>
+    <iframe src="/ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583" title="Everchanging Test Board"></iframe>
+
+    <p>served by <a href="https://github.com/royragsdale/s83">s83d</a></p>
+</body>
+</html>

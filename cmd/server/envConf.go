@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 	"strconv"
@@ -14,8 +15,10 @@ const envPort = "PORT"
 const envStore = "STORE"
 const envTTL = "TTL"
 const envFactor = "DIFFICULTY"
+const envTitle = "TITLE"
+const envAdmin = "ADMINBOARD"
 
-var envVars = []string{envHost, envPort, envStore, envTTL, envFactor}
+var envVars = []string{envHost, envPort, envStore, envTTL, envFactor, envTitle, envAdmin}
 
 var defaultVars = map[string]string{
 	envHost:   "",
@@ -23,6 +26,8 @@ var defaultVars = map[string]string{
 	envStore:  "store",
 	envTTL:    "22",
 	envFactor: "0.0",
+	envTitle:  "s83d",
+	envAdmin:  "",
 }
 
 type Server struct {
@@ -32,8 +37,11 @@ type Server struct {
 	difficultyFactor    float64
 	difficultyThreshold uint64 // TODO: simplify into Difficulty type to keep in sync
 	ttl                 int    // days
+	title               string
+	admin               *s83.Publisher
 	blockList           map[string]bool
-	creator             s83.Creator
+	testCreator         s83.Creator // test key
+	templates           *template.Template
 }
 
 func NewServerFromEnv() *Server {
@@ -44,15 +52,27 @@ func NewServerFromEnv() *Server {
 	ttl := intOrDefault(envTTL)
 	difficultyFactor := floatOrDefault(envFactor)
 	storePath := varOrDefault(envStore)
+	title := varOrDefault(envTitle)
+	adminKey := varOrDefault(envAdmin)
 
 	// TODO: add server private key
 	// TODO: load block list from a board
 	blockList := map[string]bool{s83.TestPublic: true}
 
 	// creator for the test key board
-	creator, err := s83.NewCreatorFromKey(s83.TestPrivate)
+	testCreator, err := s83.NewCreatorFromKey(s83.TestPrivate)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// admin board
+	var admin *s83.Publisher = nil
+	adminPub, err := s83.NewPublisherFromKey(adminKey)
+	if err != nil {
+		log.Println("no admin board configured")
+	} else {
+		admin = &adminPub
+		log.Println("admin board configured for ", adminPub)
 	}
 
 	// pre compute difficultyThreshold
@@ -68,7 +88,23 @@ func NewServerFromEnv() *Server {
 	}
 	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
 
-	srv := &Server{host, port, store, difficultyFactor, threshold, ttl, blockList, creator}
+	// load templates
+	templates := template.Must(template.ParseFS(resources, "templates/*.tmpl"))
+
+	srv := &Server{
+		host,
+		port,
+		store,
+		difficultyFactor,
+		threshold,
+		ttl,
+		title,
+		admin,
+		blockList,
+		testCreator,
+		templates,
+	}
+
 	log.Printf("difficulty factor: %f", srv.difficultyFactor)
 	log.Printf("board TTL: %d (days)", srv.ttl)
 	return srv
