@@ -9,60 +9,53 @@ for fun.
 **Very much in flux**, but sufficiently conformant to publish and get from the
 demo server!
 
-I'm hosting a server at [may83.club](https://may83.club) and am
-springing at [db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223](https://may83.club/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223).
+I'm hosting a server at [may83.club](https://may83.club).
+
+Publishing at [db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223](https://may83.club/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223).
 
 ## Quick Start/Demo
 
-1. Build client (`s83`) and server (`s83d`).
+1. Build client (`s83`)
 ```
 $ go build -o bin/s83 ./cmd/client
-$ go build -o bin/s83d ./cmd/server
 $ cd bin
 ```
 
-2. Make a directory (`store`) for the server to store it's boards, then start server
-and leave it running in another window.
-```
-$ mkdir store
-$ ./s83d
-```
-
-3. Generate a creator key ("secret"). This may take a few minutes to get lucky.
-   Speed it up with (`-j N`) where `N` is the number of miners to run. Locally
-   I get ~160k attempts per second.
+2. Generate a creator key ("secret"). This may take a few minutes to get lucky.
 ```
 $ ./s83 new
 ```
 
-4. Add your keys to a "profile"
+Speed it up with (`-j N`) where `N` is the number of miners to run. Locally
+I get ~160k attempts per second.
 
-_You can have multiple profiles and switch between them with `./s38 -c PROFILE`_
 
-Add the keys you just generated to your client profile and set the server to
-point at your local server like below.
+3. Add your keys to a "profile"
 
-Aside from the simple `key = value` lines this attempts to conform to the
-"Springfile" convention so you can add a list of the boards you would like to
-follow, optionally preceded by a _handle_ for how you would like to track that
-board (`me` in this example).
+Add the keys you just generated to your client profile.
 
 `~/.config/s83/default`
 ```
 secret = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-server = http://localhost:8080
+server = https://may83.club
 
 me
 http://localhost:8080/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
 ```
 
-5. Verify you can reach your server by getting the ever-changing test board.
+_You can have multiple profiles and switch between them with `./s38 -c PROFILE`_
+
+Aside from the simple `key = value` lines this attempts to conform to the
+"Springfile" convention so you can add a list of the boards you would like to
+follow, optionally preceded by a _handle_ for how you would like to track that
+board (`me` in the example above).
+
+4. Verify you can reach the server by getting the ever-changing test board.
 ```
 $ ./s83 get ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583
 ```
 
-6. Make a board and publish it (don't worry this is just to your local test
-   server)!
+5. Make a board and publish it!
 ```
 $ echo "<h1>It's Alive</h1>" > board.html
 
@@ -70,14 +63,14 @@ $ ./s83 pub board.html
 [info] Success
 ```
 
-7. Assuming you added your key to your configuration you can check out your great
+6. Assuming you added your key to your configuration you can check out your great
 work with a simple `get` which will fetch all of your configured/followed boards.
 ```
 $ ./s83 get
 ```
 
-At this point the client only fetches the raw boards, so you can list/view them
-however is convenient:
+At this point the client only fetches the raw boards. You can list/view them
+however is most convenient:
 ```
 $ ls ~/.config/s83/data/default/*
 $ cat ~/.config/s83/data/default/*
@@ -85,9 +78,13 @@ $ cat ~/.config/s83/data/default/*
 
 Enjoy!
 
-Some public servers you can publish boards to are:
+In addition to [https://may83.club](https://may83.club). Some other public
+servers you can publish boards to are:
+
 - [https://bogbody.biz](https://bogbody.biz)
 - [https://0l0.lol/](https://0l0.lol/)
+- [https://spring83.kindrobot.ca](https://spring83.kindrobot.ca)
+- [https://spring83.mozz.us](https://spring83.mozz.us/)
 
 ## Current Limitations
 
@@ -141,6 +138,12 @@ TTL              22
 DIFFICULTY       0.0
 TITLE            s83d
 ADMIN_BOARD
+```
+
+### Local Quick Serve
+
+```
+make serve
 ```
 
 ## Design Decisions
