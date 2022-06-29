@@ -16,7 +16,7 @@ const envStore = "STORE"
 const envTTL = "TTL"
 const envFactor = "DIFFICULTY"
 const envTitle = "TITLE"
-const envAdmin = "ADMINBOARD"
+const envAdmin = "ADMIN_BOARD"
 
 var envVars = []string{envHost, envPort, envStore, envTTL, envFactor, envTitle, envAdmin}
 
