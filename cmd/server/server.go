@@ -22,15 +22,21 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	// Log requests (TODO: configurable verbosity)
 	log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 
+	// Common headers
+	w.Header().Set("Spring-Version", s83.SpringVersion)
+	w.Header().Set("Content-Type", "text/html;charset=utf-8")
+
+	// CORS (TODO: verify details of which requests require it)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Modified-Since, Spring-Signature, Spring-Version")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Last-Modified, Spring-Difficulty, Spring-Signature, Spring-Version")
+
 	// Servers must support preflight OPTIONS requests to all endpoints
 	if req.Method == http.MethodOptions {
 		srv.handleOptions(w, req)
 		return
 	}
-
-	// Common headers
-	w.Header().Set("Spring-Version", s83.SpringVersion)
-	w.Header().Set("Content-Type", "text/html;charset=utf-8")
 
 	// GET / ("homepage"/difficulty)
 	if req.URL.Path == "/" {
@@ -41,16 +47,6 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 		srv.handleDifficulty(w, req)
 		return
 	}
-
-	// TODO: disagree with SPEC (prevents just normal web browser from opening links)
-	// ref: https://github.com/robinsloan/spring-83-spec/issues/7
-	/*
-		// Check this is an actual Spring-83 client
-		if req.Header.Get("Spring-Version") != s83.SpringVersion {
-			http.Error(w, "400 - Invalid Spring-Version", http.StatusBadRequest)
-			return
-		}
-	*/
 
 	// GET/PUT /<key> (boards)
 	reKey := regexp.MustCompile(`^\/([0-9A-Fa-f]{64}?)$`)
@@ -75,10 +71,6 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Modified-Since, Spring-Signature, Spring-Version")
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Last-Modified, Spring-Difficulty, Spring-Signature, Spring-Version")
 	w.WriteHeader(http.StatusNoContent)
 }
 
