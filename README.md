@@ -15,13 +15,16 @@ Publishing at [db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223]
 
 ## Quick Start/Demo
 
-1. Build client (`s83`)
+#### 1. Build client (`s83`)
 ```
 $ go build -o bin/s83 ./cmd/client
 $ cd bin
 ```
 
-2. Generate a creator key ("secret"). This may take a few minutes to get lucky.
+#### 2. Generate a creator key ("secret").
+
+This may take a few minutes to get lucky.
+
 ```
 $ ./s83 new
 ```
@@ -30,7 +33,7 @@ Speed it up with (`-j N`) where `N` is the number of miners to run. Locally
 I get ~160k attempts per second.
 
 
-3. Add your keys to a "profile"
+#### 3. Add your keys to a "profile"
 
 Add the keys you just generated to your client profile.
 
@@ -50,12 +53,12 @@ Aside from the simple `key = value` lines this attempts to conform to the
 follow, optionally preceded by a _handle_ for how you would like to track that
 board (`me` in the example above).
 
-4. Verify you can reach the server by getting the ever-changing test board.
+#### 4. Verify you can reach the server by getting the ever-changing test board.
 ```
 $ ./s83 get ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583
 ```
 
-5. Make a board and publish it!
+#### 5. Make a board and publish it.
 ```
 $ echo "<h1>It's Alive</h1>" > board.html
 
@@ -63,20 +66,24 @@ $ ./s83 pub board.html
 [info] Success
 ```
 
-6. Assuming you added your key to your configuration you can check out your great
-work with a simple `get` which will fetch all of your configured/followed boards.
+#### 6. Get your board.
+
+Assuming you added your key to your configuration you can check out your great
+work with a simple `get` which will fetch all of your configured/followed
+boards.
+
 ```
 $ ./s83 get
 ```
 
-At this point the client only fetches the raw boards. You can list/view them
-however is most convenient:
+Note: At this point the client only fetches the raw boards. You can list/view
+them however is most convenient:
 ```
 $ ls ~/.config/s83/data/default/*
 $ cat ~/.config/s83/data/default/*
 ```
 
-Enjoy!
+#### 7. Enjoy!
 
 In addition to [https://may83.club](https://may83.club). Some other public
 servers you can publish boards to are:
