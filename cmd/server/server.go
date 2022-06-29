@@ -247,6 +247,10 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	// TODO: queue board up for gossip
 }
 
+func (srv *Server) favicon(w http.ResponseWriter, r *http.Request) {
+	w.Write(favicon)
+}
+
 func main() {
 	// support just the default -h/--help to describe the environment variables supported
 	flag.Usage = envUsage
@@ -254,6 +258,9 @@ func main() {
 
 	srv := NewServerFromEnv()
 
+	http.HandleFunc("/favicon.ico", srv.favicon)
+
+	// all API endpoints
 	http.HandleFunc("/", srv.handler)
 
 	log.Printf("starting server on %s", srv.address())

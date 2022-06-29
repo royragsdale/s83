@@ -2,6 +2,9 @@ package main
 
 import "embed"
 
+//go:embed static/favicon.ico
+var favicon []byte
+
 //go:embed templates/*
 var resources embed.FS
 
