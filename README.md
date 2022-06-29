@@ -9,7 +9,8 @@ for fun.
 **Very much in flux**, but sufficiently conformant to publish and get from the
 demo server!
 
-I'm springing at `db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223`.
+I'm hosting a server at [may83.club](https://may83.club) and am
+springing at [db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223](https://may83.club/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223).
 
 ## Quick Start/Demo
 
@@ -138,6 +139,8 @@ PORT             8080
 STORE            store
 TTL              22
 DIFFICULTY       0.0
+TITLE            s83d
+ADMIN_BOARD
 ```
 
 ## Design Decisions
