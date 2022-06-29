@@ -164,6 +164,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	if srv.boardExpired(board) {
 		log.Println("removing expired board", board.Publisher)
 		srv.store.removeBoard(board)
+		srv.store.NumBoards -= 1 // TODO: store should keep track
 		http.Error(w, "404 - Board not found", http.StatusNotFound)
 		return
 	}
@@ -211,7 +212,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 		return
 	}
 
-	skipDifficultyCheck := false
+	boardUpdate := false
 	existingBoard, err := srv.store.boardFromKey(key)
 	// there was a valid existing board
 	if err == nil {
@@ -220,7 +221,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 			return
 		}
 		// existing boards are grandfathered
-		skipDifficultyCheck = true
+		boardUpdate = true
 	}
 
 	// reject boards older than TTL
@@ -230,7 +231,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	}
 
 	// check difficulty
-	if !skipDifficultyCheck && board.Publisher.Strength() >= srv.difficultyThreshold {
+	if !boardUpdate && board.Publisher.Strength() >= srv.difficultyThreshold {
 		http.Error(w, "403: Board was submitted for a key that does not meet the difficulty factor", http.StatusForbidden)
 		return
 
@@ -240,7 +241,9 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	if err != nil {
 		fmt.Println("error saving board", err)
 		http.Error(w, "500 - Internal Server Error", http.StatusInternalServerError)
-	} else {
+	} else if !boardUpdate {
+		// TODO: store should keep track
+		// only increment if it is a new (previously unseen) board
 		srv.store.NumBoards += 1
 	}
 
