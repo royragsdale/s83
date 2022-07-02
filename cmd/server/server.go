@@ -260,16 +260,3 @@ func main() {
 	log.Printf("starting server on %s", srv.address())
 	log.Fatal(http.ListenAndServe(srv.address(), nil))
 }
-
-const testBoard = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>s83d | Hello World</title>
-</head>
-<body>
-  <h1>Magic s83-ball</h1>
-  <p>%s</p>
-</body>
-</html>
-`
