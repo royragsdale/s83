@@ -14,34 +14,30 @@ const envHost = "HOST"
 const envPort = "PORT"
 const envStore = "STORE"
 const envTTL = "TTL"
-const envFactor = "DIFFICULTY"
 const envTitle = "TITLE"
 const envAdmin = "ADMIN_BOARD"
 
-var envVars = []string{envHost, envPort, envStore, envTTL, envFactor, envTitle, envAdmin}
+var envVars = []string{envHost, envPort, envStore, envTTL, envTitle, envAdmin}
 
 var defaultVars = map[string]string{
-	envHost:   "",
-	envPort:   "8080",
-	envStore:  "store",
-	envTTL:    "22",
-	envFactor: "0.0",
-	envTitle:  "s83d",
-	envAdmin:  "",
+	envHost:  "",
+	envPort:  "8080",
+	envStore: "store",
+	envTTL:   "22",
+	envTitle: "s83d",
+	envAdmin: "",
 }
 
 type Server struct {
-	host                string
-	port                int
-	store               *Store
-	difficultyFactor    float64
-	difficultyThreshold uint64 // TODO: simplify into Difficulty type to keep in sync
-	ttl                 int    // days
-	title               string
-	admin               *s83.Publisher
-	blockList           map[string]bool
-	testCreator         s83.Creator // test key
-	templates           *template.Template
+	host        string
+	port        int
+	store       *Store
+	ttl         int // days
+	title       string
+	admin       *s83.Publisher
+	blockList   map[string]bool
+	testCreator s83.Creator // test key
+	templates   *template.Template
 }
 
 func NewServerFromEnv() *Server {
@@ -50,7 +46,6 @@ func NewServerFromEnv() *Server {
 	host := varOrDefault(envHost)
 	port := intOrDefault(envPort)
 	ttl := intOrDefault(envTTL)
-	difficultyFactor := floatOrDefault(envFactor)
 	storePath := varOrDefault(envStore)
 	title := varOrDefault(envTitle)
 	adminKey := varOrDefault(envAdmin)
@@ -75,12 +70,6 @@ func NewServerFromEnv() *Server {
 		log.Println("admin board configured for ", adminPub)
 	}
 
-	// pre compute difficultyThreshold
-	threshold, err := s83.DifficultyThreshold(difficultyFactor)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// pre load store
 	store, err := loadStore(storePath)
 	if err != nil {
@@ -95,8 +84,6 @@ func NewServerFromEnv() *Server {
 		host,
 		port,
 		store,
-		difficultyFactor,
-		threshold,
 		ttl,
 		title,
 		admin,
@@ -105,7 +92,6 @@ func NewServerFromEnv() *Server {
 		templates,
 	}
 
-	log.Printf("difficulty factor: %f", srv.difficultyFactor)
 	log.Printf("board TTL: %d (days)", srv.ttl)
 	return srv
 }

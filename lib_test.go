@@ -175,38 +175,6 @@ func TestStringFormats(t *testing.T) {
 	}
 }
 
-func TestDifficulty(t *testing.T) {
-
-	tests := []struct {
-		factor    float64
-		threshold uint64
-	}{{1.0, 0}, {0.0, MaxKey}}
-	for _, tt := range tests {
-		dT, err := DifficultyThreshold(tt.factor)
-		if err != nil {
-			t.Fatalf(`Error with valid difficulty factor: %f %v`, tt.factor, err)
-		}
-		if tt.threshold != dT {
-			t.Errorf("Factor %f, expected threshold %d, got %d", tt.factor, tt.threshold, dT)
-		}
-	}
-
-	// test random creators and round trip strength/difficulty factors to ensure they are valid
-	for i := 0; i < 10; i++ {
-		creator, err := genCreator()
-		strength := creator.Strength()
-		factor := StrengthFactor(strength)
-		dT, err := DifficultyThreshold(factor)
-		if err != nil {
-			t.Fatalf(`Error with difficulty factor derived from creator: %f %v`, factor, err)
-		}
-		if strength >= dT {
-			t.Errorf("Predicted strength factor %f, exceeded threshold %d for strength=%d, c=%s", factor, dT, strength, creator)
-		}
-	}
-
-}
-
 // TODO: test strings
 // TODO: test NewBoard edge cases
 // TODO: NewBoardFromHTTP
