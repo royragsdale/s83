@@ -56,7 +56,10 @@ func NewServerFromEnv() *Server {
 
 	// TODO: add server private key
 	// TODO: load block list from a board
-	blockList := map[string]bool{s83.TestPublic: true}
+	// used for both GET and PUT
+	blockList := map[string]bool{
+		s83.InfernalKey: true,
+	}
 
 	// creator for the test key board
 	testCreator, err := s83.NewCreatorFromKey(s83.TestPrivate)

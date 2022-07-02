@@ -28,6 +28,8 @@ const yearBase = 2000 // update in year 3000
 const TestPublic = "ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583"
 const TestPrivate = "3371f8b011f51632fea33ed0a3688c26a45498205c6097c352bd4d079d224419"
 
+const InfernalKey = "d17eef211f510479ee6696495a2589f7e9fb055c2576749747d93444883e0123"
+
 const TimeFormat8601 = "2006-01-02T15:04:05Z" //"YYYY-MM-DDTHH:MM:SSZ"
 
 type Creator struct {

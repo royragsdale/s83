@@ -135,6 +135,11 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	var board s83.Board
 	var err error
 
+	if srv.blocked(key) {
+		http.Error(w, "403 - Key Blocked", http.StatusForbidden)
+		return
+	}
+
 	// special case
 	// "an ever-changing board...with a timestamp set to the time of the request."
 	if key == s83.TestPublic {
@@ -196,7 +201,8 @@ func (srv *Server) boardExpired(board s83.Board) bool {
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
 	if srv.blocked(key) {
-		http.Error(w, "401 - Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "403 - Key Blocked", http.StatusForbidden)
+		return
 	}
 
 	// Validate Board (size, signature, timestamp)
