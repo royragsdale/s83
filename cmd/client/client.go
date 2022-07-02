@@ -223,6 +223,21 @@ func publishBoard(server *url.URL, board s83.Board) error {
 
 // TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
 
+// TODO: open links in new windows or tabs
+
+// TODO: Preparing each board for display, the client should prepend this default CSS:
+/*
+<style>
+  :host {
+    background-color: <some light, desaturated color>;
+    box-sizing: border-box;
+    padding: 2rem;
+  }
+  time { display: none; }
+  p, h1, h2, h3, h4, h5 { margin: 0 0 2rem 0; }
+</style>
+*/
+
 // cli only at the moment > to a file and view in a browser
 func (config Config) Get(key string) {
 	follows := config.Follows
