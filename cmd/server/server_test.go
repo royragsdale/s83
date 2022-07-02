@@ -41,7 +41,10 @@ func NewRequest(method string, url string, body io.Reader, t *testing.T) *http.R
 
 func TestPutBoardHandler(t *testing.T) {
 
-	blockList := map[string]bool{s83.TestPublic: true, dateToKey(time.Now()): true}
+	blockList := map[string]bool{
+		s83.TestPublic:        true,
+		s83.InfernalKey:       true,
+		dateToKey(time.Now()): true}
 	srv := testServer(t)
 	srv.blockList = blockList
 
@@ -53,7 +56,7 @@ func TestPutBoardHandler(t *testing.T) {
 		handler := http.HandlerFunc(putFunc)
 		handler.ServeHTTP(rr, req)
 		// Check the status code is what we expect.
-		if status := rr.Code; status != http.StatusUnauthorized {
+		if status := rr.Code; status != http.StatusForbidden {
 			t.Errorf("handler returned wrong status code for denylisted key: got %v want %v",
 				status, http.StatusUnauthorized)
 		}

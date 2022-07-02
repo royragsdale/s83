@@ -100,7 +100,6 @@ implemented. A non-exhaustive list of missing features follows.
 
 - server
 	- missing gossip
-	- missing difficulty verification
 	- potentially imprecise error messages
 - client
 	- no "realms"
@@ -142,7 +141,6 @@ HOST
 PORT             8080
 STORE            store
 TTL              22
-DIFFICULTY       0.0
 TITLE            s83d
 ADMIN_BOARD
 ```

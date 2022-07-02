@@ -30,7 +30,7 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Modified-Since, Spring-Signature, Spring-Version")
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Last-Modified, Spring-Difficulty, Spring-Signature, Spring-Version")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Last-Modified, Spring-Signature, Spring-Version")
 
 	// Servers must support preflight OPTIONS requests to all endpoints
 	if req.Method == http.MethodOptions {
@@ -38,13 +38,13 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// GET / ("homepage"/difficulty)
+	// GET / ("homepage")
 	if req.URL.Path == "/" {
 		if req.Method != http.MethodGet {
 			http.Error(w, "405 - Method Not Allowed: use GET", http.StatusMethodNotAllowed)
 			return
 		}
-		srv.handleDifficulty(w, req)
+		srv.handleHome(w, req)
 		return
 	}
 
@@ -75,23 +75,19 @@ func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
 }
 
 type indexData struct {
-	Title      string
-	Admin      *s83.Publisher
-	NumBoards  int
-	TTL        int
-	Difficulty float64
+	Title     string
+	Admin     *s83.Publisher
+	NumBoards int
+	TTL       int
 }
 
-func (srv *Server) handleDifficulty(w http.ResponseWriter, req *http.Request) {
-
-	w.Header().Set("Spring-Difficulty", fmt.Sprintf("%f", srv.difficultyFactor))
+func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) {
 
 	data := indexData{
 		srv.title,
 		srv.admin,
 		srv.store.NumBoards,
 		srv.ttl,
-		srv.difficultyFactor,
 	}
 
 	srv.templates.ExecuteTemplate(w, tIndex, data)
@@ -128,6 +124,11 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	var board s83.Board
 	var err error
 
+	if srv.blocked(key) {
+		http.Error(w, "403 - Key Blocked", http.StatusForbidden)
+		return
+	}
+
 	// special case
 	// "an ever-changing board...with a timestamp set to the time of the request."
 	if key == s83.TestPublic {
@@ -146,6 +147,8 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 			return
 		}
 	}
+
+	// TODO: handle "tombstone" boards, "404 Not Found"
 
 	if !board.VerifySignature() {
 		log.Println("loaded board with a failed signature", board)
@@ -172,6 +175,8 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 		return
 	}
 
+	// TODO: (optional) special case wrap boards from requests missing a Spring-Version header
+
 	w.Header().Set("Spring-Signature", board.Signature())
 	// DO NOT "format" board content. It is user supplied.
 	w.Write(board.Content)
@@ -189,7 +194,8 @@ func (srv *Server) boardExpired(board s83.Board) bool {
 func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
 
 	if srv.blocked(key) {
-		http.Error(w, "401 - Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "403 - Key Blocked", http.StatusForbidden)
+		return
 	}
 
 	// Validate Board (size, signature, timestamp)
@@ -220,13 +226,6 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	if srv.boardExpired(board) {
 		http.Error(w, "409 - Submission older than server TTL", http.StatusConflict)
 		return
-	}
-
-	// check difficulty
-	if !boardUpdate && board.Publisher.Strength() >= srv.difficultyThreshold {
-		http.Error(w, "403: Board was submitted for a key that does not meet the difficulty factor", http.StatusForbidden)
-		return
-
 	}
 
 	err = srv.store.saveBoard(board)

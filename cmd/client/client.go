@@ -25,7 +25,7 @@ func main() {
 	var confFlag = flag.String("c", defaultConfigName, "name of configuration file to use")
 
 	// New creator
-	// TODO: add flags for, difficulty, check existence
+	// TODO: add flags to save/export as a config
 	newCmd := flag.NewFlagSet("new", flag.ExitOnError)
 	jFlag := newCmd.Int("j", 1, "number of miners to run concurrently")
 
@@ -33,6 +33,7 @@ func main() {
 	whoCmd := flag.NewFlagSet("who", flag.ExitOnError)
 
 	// Publish a board
+	// TODO: handle "delete" functionality, aka "tombstone" boards, "404 Not Found"
 	pubCmd := flag.NewFlagSet("pub", flag.ExitOnError)
 	pubCmd.Usage = func() {
 		// TODO: fix usange to show args
@@ -145,13 +146,8 @@ func (config Config) New(j int) {
 	elapsed := t.Sub(start).Seconds()
 	kps := int(float64(c.Count) / elapsed)
 
-	// compute key characteristics
-	strength := c.Creator.Strength()
-	strengthFactor := s83.StrengthFactor(strength)
-
 	// display results
 	fmt.Printf("[info] Success! Found a valid key in %d iterations over %d seconds (%d kps)\n", c.Count, int(elapsed), kps)
-	fmt.Printf("[info] This key passes a difficulty factor of ~%0.3f (strength=%d)\n", strengthFactor, strength)
 	fmt.Println("[info] The public key is your creator id. Share it!")
 	fmt.Println("[WARN] The secret key is SECRET. Do not share it or lose it.")
 	fmt.Println("public:", c.Creator)
@@ -172,7 +168,7 @@ func (config Config) Pub(path string, dryRun bool) {
 	if !dryRun {
 		exitOnError(publishBoard(config.Server, board))
 	} else {
-		fmt.Println("[info] Success. This board should publish (pending difficulty and TTL checks)")
+		fmt.Println("[info] Success. This board should publish (pending TTL checks)")
 		fmt.Println("[info] Size: ", len(board.Content))
 		fmt.Println(board)
 	}
@@ -227,6 +223,21 @@ func publishBoard(server *url.URL, board s83.Board) error {
 // TODO: Content Security Policy (CSP) to prevent images and js/fonts/media
 
 // TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
+
+// TODO: open links in new windows or tabs
+
+// TODO: Preparing each board for display, the client should prepend this default CSS:
+/*
+<style>
+  :host {
+    background-color: <some light, desaturated color>;
+    box-sizing: border-box;
+    padding: 2rem;
+  }
+  time { display: none; }
+  p, h1, h2, h3, h4, h5 { margin: 0 0 2rem 0; }
+</style>
+*/
 
 // cli only at the moment > to a file and view in a browser
 func (config Config) Get(key string) {
