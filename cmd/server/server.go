@@ -60,10 +60,6 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 		} else if req.Method == http.MethodPut {
 			srv.handlePutBoard(w, req, key)
 			return
-		} else if req.Method == http.MethodDelete {
-			srv.handleDeleteBoard(w, req, key)
-			return
-
 		} else {
 			http.Error(w, "405 - Method Not Allowed: use GET/PUT", http.StatusMethodNotAllowed)
 			return
@@ -76,13 +72,6 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 
 func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// TODO: A volatile end point that is still being hashed out
-// ref: https://github.com/robinsloan/spring-83/blob/main/draft-20220629.md#deleting-boards
-// discussion: https://github.com/robinsloan/spring-83/issues/10
-func (srv *Server) handleDeleteBoard(w http.ResponseWriter, req *http.Request, key string) {
-	http.Error(w, "501 - not yet implemented, pending spec", http.StatusNotImplemented)
 }
 
 type indexData struct {
@@ -158,6 +147,8 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 			return
 		}
 	}
+
+	// TODO: handle "tombstone" boards, "404 Not Found"
 
 	if !board.VerifySignature() {
 		log.Println("loaded board with a failed signature", board)

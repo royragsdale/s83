@@ -33,6 +33,7 @@ func main() {
 	whoCmd := flag.NewFlagSet("who", flag.ExitOnError)
 
 	// Publish a board
+	// TODO: handle "delete" functionality, aka "tombstone" boards, "404 Not Found"
 	pubCmd := flag.NewFlagSet("pub", flag.ExitOnError)
 	pubCmd.Usage = func() {
 		// TODO: fix usange to show args
