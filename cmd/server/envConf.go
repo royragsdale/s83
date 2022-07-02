@@ -50,6 +50,10 @@ func NewServerFromEnv() *Server {
 	title := varOrDefault(envTitle)
 	adminKey := varOrDefault(envAdmin)
 
+	if ttl <= 3 || ttl > 22 {
+		log.Fatalf("Invalid TTL (%d), must be longer than 3 days and shorter than 22 days.", ttl)
+	}
+
 	// TODO: add server private key
 	// TODO: load block list from a board
 	blockList := map[string]bool{s83.TestPublic: true}
