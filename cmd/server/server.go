@@ -175,6 +175,8 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 		return
 	}
 
+	// TODO: (optional) special case wrap boards from requests missing a Spring-Version header
+
 	w.Header().Set("Spring-Signature", board.Signature())
 	// DO NOT "format" board content. It is user supplied.
 	w.Write(board.Content)
