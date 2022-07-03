@@ -31,6 +31,11 @@ const TestPrivate = "3371f8b011f51632fea33ed0a3688c26a45498205c6097c352bd4d079d2
 const InfernalKey = "d17eef211f510479ee6696495a2589f7e9fb055c2576749747d93444883e0123"
 
 const TimeFormat8601 = "2006-01-02T15:04:05Z" //"YYYY-MM-DDTHH:MM:SSZ"
+const ClientCSS = `<style>
+        :host { all: initial; display: block; box-sizing: border-box; padding: 2rem; }
+        time { display: none; }
+        p, h1, h2, h3, h4, h5 { margin: 0 0 2rem 0; }
+        </style>`
 
 type Creator struct {
 	PrivateKey ed25519.PrivateKey
