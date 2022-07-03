@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -39,12 +40,12 @@ func main() {
 	// Publish a board
 	// TODO: handle "delete" functionality, aka "tombstone" boards, "404 Not Found"
 	pubCmd := flag.NewFlagSet("pub", flag.ExitOnError)
-	dryFlag := pubCmd.Bool("dry", false, "dry run, print board locally instread of publishing")
+	dryFlag := pubCmd.Bool("dry", false, "dry run, print board locally instead of publishing")
 
 	// Get boards from a server
 	// TODO: add flags to store, launch browser, set mod time (e.g. from local copy)
-	// TODO: saved list of boards to fetch (e.g. subscription)
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
+	browseFlag := getCmd.Bool("go", false, "open your 'Daily Spring' in a browser")
 
 	cmdOrder := []string{"pub", "get", "new", "who"}
 	cmds := map[string]struct {
@@ -52,7 +53,7 @@ func main() {
 		description string
 	}{
 		"pub": {pubCmd, "publish a board"},
-		"get": {getCmd, "get follows/boards"},
+		"get": {getCmd, "download follows/boards and make your 'Daily Spring'"},
 		"new": {newCmd, "generate a new keypair"},
 		"who": {whoCmd, "show profile information"},
 	}
@@ -83,14 +84,13 @@ func main() {
 
 	getCmd.Usage = func() {
 		fmt.Printf("%s: %s\n", "get", cmds["get"].description)
-		fmt.Println("\nusage: s83 get [key]")
+		fmt.Println("\nusage: s83 get [flags] [key]")
 
+		fmt.Println("\nflags:")
 		getCmd.PrintDefaults()
 
 		fmt.Println("\noptional:")
 		fmt.Printf("  %-8s %s\n", "key", "get a single board")
-
-		fmt.Println("\nDefaults to getting all the boards followed in your profile.")
 	}
 
 	newCmd.Usage = func() {
@@ -129,8 +129,8 @@ func main() {
 	case "pub":
 		pubCmd.Parse(subArgs)
 		if pubCmd.NArg() != 1 {
-			pubCmd.Usage()
 			fmt.Println("<path> to file to be published is required")
+			pubCmd.Usage()
 			os.Exit(1)
 		}
 
@@ -156,7 +156,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		config.Get(getCmd.Arg(0))
+		config.Get(getCmd.Arg(0), *browseFlag)
 
 	default:
 		fmt.Printf("invalid command\n\n")
@@ -251,7 +251,7 @@ func publishBoard(server *url.URL, board s83.Board) error {
 // TODO: the client may also scan for arbitrary data stored in
 // data-spring-* attributes throughout the board.
 
-func (config Config) Get(key string) {
+func (config Config) Get(key string, browse bool) {
 	follows := config.Follows
 
 	// single key specified
@@ -324,6 +324,22 @@ func (config Config) Get(key string) {
 	}
 
 	fmt.Printf("[info] Published your 'Daily Spring' to: %s\n", outPath)
+
+	if browse {
+		err := openBrowserToPath(outPath)
+		if err != nil {
+			fmt.Printf("[warn] Failed launching a browser: %v\n", err)
+		} else {
+			fmt.Println("[info] Success, check your browser for your 'Daily Spring'")
+		}
+	}
+}
+
+func openBrowserToPath(path string) error {
+	// TODO: generalize for other launchers/platform, and better error checking
+	fmt.Println(path)
+	cmd := exec.Command("xdg-open", path)
+	return cmd.Run()
 }
 
 func (config Config) followToPath(f s83.Follow) string {
