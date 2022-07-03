@@ -26,7 +26,7 @@ func main() {
 	rand.Seed(time.Now().Unix())
 
 	// TODO: add global verbose flag
-	var confFlag = flag.String("c", defaultConfigName, "name of configuration file to use")
+	var confFlag = flag.String("c", defaultConfigName, "name of profile file to use")
 
 	// New creator
 	// TODO: add flags to save/export as a config
@@ -39,41 +39,70 @@ func main() {
 	// Publish a board
 	// TODO: handle "delete" functionality, aka "tombstone" boards, "404 Not Found"
 	pubCmd := flag.NewFlagSet("pub", flag.ExitOnError)
-	pubCmd.Usage = func() {
-		// TODO: fix usange to show args
-		fmt.Fprintf(pubCmd.Output(), "usage: pub <path>\n")
-	}
 	dryFlag := pubCmd.Bool("dry", false, "dry run, print board locally instread of publishing")
 
 	// Get boards from a server
 	// TODO: add flags to store, launch browser, set mod time (e.g. from local copy)
 	// TODO: saved list of boards to fetch (e.g. subscription)
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
-	getCmd.Usage = func() {
-		fmt.Fprintf(getCmd.Output(), "usage: get [public]\n")
-	}
 
-	cmds := []struct {
-		name string
-		fs   *flag.FlagSet
+	cmdOrder := []string{"pub", "get", "new", "who"}
+	cmds := map[string]struct {
+		fs          *flag.FlagSet
+		description string
 	}{
-		{"pub", pubCmd},
-		{"get", getCmd},
-		{"new", newCmd},
-		{"who", whoCmd},
+		"pub": {pubCmd, "publish a board"},
+		"get": {getCmd, "get follows/boards"},
+		"new": {newCmd, "generate a new keypair"},
+		"who": {whoCmd, "show profile information"},
 	}
 
-	// TODO: list of commands with descriptions
-	// build up expected usage
-	expectedStr := "expected a subcommand:"
-	for i, cmd := range cmds {
-		if i > 0 {
-			expectedStr += ","
+	flag.Usage = func() {
+		fmt.Println("usage: s83 [flags] <command>")
+
+		fmt.Println("\ncommands:")
+		for _, cName := range cmdOrder {
+			cmd := cmds[cName]
+			fmt.Printf("  %-8s %s\n", cName, cmd.description)
+
 		}
-		if i == len(cmds)-1 {
-			expectedStr += " or"
-		}
-		expectedStr += fmt.Sprintf(` '%s'`, cmd.name)
+
+		fmt.Println("\nflags:")
+		flag.PrintDefaults()
+
+		fmt.Println("\nUse \"s83 <command> -h\" for more information about a command.")
+	}
+
+	pubCmd.Usage = func() {
+		fmt.Printf("%s: %s\n", "pub", cmds["pub"].description)
+		fmt.Println("\nusage: s83 pub [flags] <path>")
+
+		fmt.Println("\nflags:")
+		pubCmd.PrintDefaults()
+	}
+
+	getCmd.Usage = func() {
+		fmt.Printf("%s: %s\n", "get", cmds["get"].description)
+		fmt.Println("\nusage: s83 get [key]")
+
+		getCmd.PrintDefaults()
+
+		fmt.Println("\noptional:")
+		fmt.Printf("  %-8s %s\n", "key", "get a single board")
+
+		fmt.Println("\nDefaults to getting all the boards followed in your profile.")
+	}
+
+	newCmd.Usage = func() {
+		fmt.Printf("%s: %s\n", "new", cmds["new"].description)
+		fmt.Println("\nusage: s83 new [flags]")
+		fmt.Println("\nflags:")
+		newCmd.PrintDefaults()
+	}
+
+	whoCmd.Usage = func() {
+		fmt.Printf("%s: %s\n", "who", cmds["who"].description)
+		fmt.Println("\nusage: s83 who")
 	}
 
 	// parse global flags
@@ -81,8 +110,7 @@ func main() {
 	config := loadConfig(*confFlag)
 
 	if flag.NArg() < 1 {
-		// TODO: proper usage
-		fmt.Println(expectedStr)
+		flag.Usage()
 		os.Exit(1)
 	}
 	subArgs := flag.Args()[1:]
@@ -131,7 +159,8 @@ func main() {
 		config.Get(getCmd.Arg(0))
 
 	default:
-		fmt.Println(expectedStr)
+		fmt.Printf("invalid command\n\n")
+		flag.Usage()
 		os.Exit(1)
 	}
 }
