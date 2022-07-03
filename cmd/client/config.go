@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"net/url"
 	"os"
@@ -19,10 +21,12 @@ secret =
 server =`
 
 type Config struct {
-	Name    string
-	Creator s83.Creator
-	Server  *url.URL
-	Follows []s83.Follow
+	Name      string
+	Creator   s83.Creator
+	Server    *url.URL
+	Follows   []s83.Follow
+	templates *template.Template
+	Favicon   string
 }
 
 func configDir() string {
@@ -37,19 +41,21 @@ func configPath(name string) string {
 	return filepath.Join(configDir(), name)
 }
 
+func dataPath(name string) string {
+	return filepath.Join(configDir(), "data", name)
+}
+
 func (c Config) Path() string {
-	return filepath.Join(configDir(), c.Name)
+	return configPath(c.Name)
 }
 
 func (c Config) DataPath() string {
-	return filepath.Join(configDir(), "data", c.Name)
+	return dataPath(c.Name)
 }
 
 func initConfig(name string) []byte {
-	config := Config{}
-	config.Name = name
 	configDir := configDir()
-	configPath := config.Path()
+	configPath := configPath(name)
 
 	err := os.MkdirAll(configDir, 0700)
 	if err != nil {
@@ -88,8 +94,9 @@ func initConfig(name string) []byte {
 	return data
 }
 
-func parseConfig(data []byte) Config {
+func parseConfig(data []byte, name string) Config {
 	config := Config{}
+	config.Name = name
 
 	// match configuration keys (secert=, server=)
 	rePrivateKey := regexp.MustCompile(`(?m)^secret\s*=\s*([0-9A-Fa-f]{64}?)$`)
@@ -119,13 +126,20 @@ func parseConfig(data []byte) Config {
 		}
 	}
 	config.Follows = s83.ParseSpringfileFollows(data)
+
+	// load templates
+	config.templates = template.Must(template.ParseFS(resources, "templates/*.tmpl"))
+	if config.templates == nil {
+		log.Fatal("Error loading templates")
+	}
+
+	config.Favicon = base64.StdEncoding.EncodeToString(favicon)
+
 	return config
 }
 
 func loadConfig(name string) Config {
-	config := Config{}
-	config.Name = name
-	configPath := config.Path()
+	configPath := configPath(name)
 
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -145,15 +159,13 @@ func loadConfig(name string) Config {
 	}
 
 	// ensure config data dir exists
-	dataPath := config.DataPath()
+	dataPath := dataPath(name)
 	err = os.MkdirAll(dataPath, 0700)
 	if err != nil {
 		log.Fatalf("Error creating config data directory: %s : %v", dataPath, err)
 	}
 
-	config = parseConfig(data)
-	config.Name = name
-	return config
+	return parseConfig(data, name)
 }
 
 func (config Config) String() string {

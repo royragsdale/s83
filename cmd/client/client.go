@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,6 +21,9 @@ import (
 
 // ref: https://gobyexample.com/command-line-subcommands
 func main() {
+
+	// seed for nonces
+	rand.Seed(time.Now().Unix())
 
 	// TODO: add global verbose flag
 	var confFlag = flag.String("c", defaultConfigName, "name of configuration file to use")
@@ -212,34 +216,12 @@ func publishBoard(server *url.URL, board s83.Board) error {
 // "If the signature is not valid,the client must drop the response and
 // remove the server from its list of trustworthy peers
 
-// TODO: situate each board inside its own Shadow DOM (combine multiple boards?)
-
 // TODO: Clients should scan for the <link rel="next"> element:
 // <link rel="next" href="<URL>">
 
 // TODO: the client may also scan for arbitrary data stored in
 // data-spring-* attributes throughout the board.
 
-// TODO: Content Security Policy (CSP) to prevent images and js/fonts/media
-
-// TODO: display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1
-
-// TODO: open links in new windows or tabs
-
-// TODO: Preparing each board for display, the client should prepend this default CSS:
-/*
-<style>
-  :host {
-    background-color: <some light, desaturated color>;
-    box-sizing: border-box;
-    padding: 2rem;
-  }
-  time { display: none; }
-  p, h1, h2, h3, h4, h5 { margin: 0 0 2rem 0; }
-</style>
-*/
-
-// cli only at the moment > to a file and view in a browser
 func (config Config) Get(key string) {
 	follows := config.Follows
 
@@ -253,8 +235,11 @@ func (config Config) Get(key string) {
 	}
 
 	errCnt := 0
-	boards := []s83.Board{}
+	newBoards := map[string]s83.Board{}
+	localBoards := map[string]s83.Board{}
 	for _, f := range follows {
+		key := f.Key()
+
 		// default to omit modified time header
 		modTimeStr := ""
 
@@ -263,6 +248,7 @@ func (config Config) Get(key string) {
 		if err == nil {
 			// get our copy of the timestamp (only want boards newer than this)
 			modTimeStr = localBoard.Timestamp()
+			localBoards[key] = localBoard
 		}
 
 		// fetch board from server
@@ -278,19 +264,37 @@ func (config Config) Get(key string) {
 			continue
 		}
 
-		// save to disk
+		// some servers don't reply Not Modified, making all boards seem new
+		// do a local check to allow follow on styling/alerting
+		if b.SameAs(localBoard) {
+			continue
+		}
+
+		// Actually got a new board. Save to disk.
 		b.Save(config.DataPath())
-		boards = append(boards, b)
+		newBoards[key] = b
 	}
+
+	outPath := config.outPath()
+	outF, err := os.Create(outPath)
+	if err != nil {
+		log.Printf("error: %v\n", err)
+		return
+	}
+	defer outF.Close()
+
+	config.renderBoards(newBoards, localBoards, outF)
 
 	// output results message
 	if errCnt == 0 {
-		fmt.Printf("[info] Success. Saved %d boards to %s\n", len(boards), config.DataPath())
+		fmt.Printf("[info] Success. Saved %d boards to %s\n", len(newBoards), config.DataPath())
 	} else if errCnt == len(follows) {
 		exitOnError(errors.New("Failed to get any boards"))
 	} else {
 		fmt.Printf("[warn] Failed to get %d/%d boards\n", errCnt, len(follows))
 	}
+
+	fmt.Printf("[info] Published your 'Daily Spring' to: %s\n", outPath)
 }
 
 func (config Config) followToPath(f s83.Follow) string {

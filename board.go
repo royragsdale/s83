@@ -25,6 +25,10 @@ type Board struct {
 }
 
 func (b Board) String() string {
+	return string(b.Content)
+}
+
+func (b Board) Info() string {
 	return fmt.Sprintf("verifies  : %t\ncreator   : %s\nsignature : %s\n%s", b.VerifySignature(), b.Publisher, b.signature, b.Content)
 }
 

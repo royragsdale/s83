@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+
+    <!-- Embed a favicon to the output is self contained -->
+    <link href="data:image/x-icon;base64,{{.Favicon}}" rel="icon" type="image/x-icon" />
+
+    <!-- Content Security Policy (CSP) to prevent images and js/fonts/media -->
+    <meta http-equiv="Content-Security-Policy" content="{{.ClientCSP}}">
+
+    <!-- open links in new windows or tabs -->
+    <base target="_blank">
+
+    <style type="text/css">
+        body {
+            padding:0px 10px 0px 10px;
+        }
+
+        .header-wrap, .footer-wrap{
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            text-align: center;
+            margin-bottom: auto;
+        }
+
+        .header-left, .header-right, .header-center {
+            margin-top: auto;
+        }
+
+        .header-left, .header-right{
+            width:10%;
+        }
+
+        .mono-news {
+            font-family: 'Courier New', monospace;
+        }
+
+        .footer-wrap{
+            display: flex;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .content {
+            border: 3px solid black;
+            padding: 3px;
+            min-height: 82vh;
+        }
+
+        .flex-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* display each board in a region with an aspect ratio of either 1:sqrt(2) or sqrt(2):1 */
+        .flex-item {
+            border: 1px solid #444;
+            aspect-ratio: 1 / 1.414;
+            width: 450px;
+            margin: 1px;
+            overflow: scroll;
+        }
+    </style>
+
+    <title>The Daily Spring</title>
+</head>
+<body>
+
+
+    <div class="header-wrap">
+        <div class="header-left mono-news"><p>{{.HeaderLeft}}</p></div>
+        <div class="header-center mono-news"><h1>The Daily Spring</h1></div>
+        <div class="header-right mono-news"><p>{{.HeaderRight}}</p></div>
+    </div>
+    <hr>
+
+    <!-- elements to create shadow DOMs on -->
+    <div class="flex-container">
+    {{range $i, $b := .Boards}}
+        <!-- Shadow DOM approach --> 
+        <board-elem class="flex-item" id="board-{{$i}}-{{$b.Publisher}}"></board-elem>
+    {{end}}
+    </div>
+    <hr>
+
+    <div class="footer-wrap mono-news">
+        <p>hot off the <a href="https://github.com/royragsdale/s83/">s83</a> press</p>
+    </div>
+
+    <!-- Shadow DOM approach -->
+    <script nonce={{.Nonce}}>
+    var spring83css = "{{.ClientCSS}}"
+
+    {{range $i, $b := .Boards}}
+        document.getElementById("board-{{$i}}-{{$b.Publisher}}").attachShadow({mode: 'open'}).innerHTML = spring83css + {{ $b.String}};
+    {{end}}
+    </script>
+
+</body>
+</html>
