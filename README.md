@@ -2,14 +2,14 @@
 
 A sample [Spring '83](https://www.robinsloan.com/lab/specifying-spring-83/)
 client and server implementation according to the draft
-[spec (16 JUN)](https://github.com/robinsloan/spring-83-spec/blob/main/draft-20220616.md)
+[spec (29 JUN)](https://github.com/robinsloan/spring-83-spec/blob/main/draft-20220629.md)
 in response to Robin’s Request For Friendly Critique and Comment (RRFFCC) and
 for fun.
 
 **Very much in flux**, but sufficiently conformant to publish and get from the
 demo server!
 
-I'm hosting a server at [may83.club](https://may83.club).
+Hosted server at [may83.club](https://may83.club).
 
 Publishing at [db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223](https://may83.club/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223).
 
@@ -19,6 +19,7 @@ Publishing at [db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223]
 ```
 $ go build -o bin/s83 ./cmd/client
 $ cd bin
+$ ./s83 --help
 ```
 
 #### 2. Generate a creator key ("secret").
@@ -35,7 +36,7 @@ I get ~160k attempts per second.
 
 #### 3. Add your keys to a "profile"
 
-Add the keys you just generated to your client profile.
+Add the keys you just generated to the `default` client profile.
 
 `~/.config/s83/default`
 ```
@@ -43,13 +44,13 @@ secret = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 server = https://may83.club
 
 me
-http://localhost:8080/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
+http://may83.club/db8a22f49c7f98690106cc2aaac15201608db185b4ada99b5bf4f222883e1223
 ```
 
 _You can have multiple profiles and switch between them with `./s38 -c PROFILE`_
 
 Aside from the simple `key = value` lines this attempts to conform to the
-"Springfile" convention so you can add a list of the boards you would like to
+"Springfile" convention. You can add a list of the board URLs you would like to
 follow, optionally preceded by a _handle_ for how you would like to track that
 board (`me` in the example above).
 
@@ -69,29 +70,38 @@ $ ./s83 pub board.html
 #### 6. Get your board.
 
 Assuming you added your key to your configuration you can check out your great
-work with a simple `get` which will fetch all of your configured/followed
-boards.
+work with a simple `get`. This will fetch all of your/followed boards, and
+render them to a local HTML file, _The Daily Spring_.
 
 ```
 $ ./s83 get
 ```
 
-Note: At this point the client only fetches the raw boards. You can list/view
-them however is most convenient:
+You just distilled the distributed, ephemeral Springiverse into a single, fully
+encapsulated, immutable, cryptographically verified, personal periodical, _The
+Daily Spring_.
+
+This is now just a local file. You can save it for later, open it right up in
+your browser of choice, email it to yourself or a friend, really anything.
+
+There are some helpful options like `-go`, which immediately opens a browser for
+instant gratification, `-new` which will only show you boards you haven't seen,
+and `-o` to save the output to a specific path. For example:
+
 ```
-$ ls ~/.config/s83/data/default/*
-$ cat ~/.config/s83/data/default/*
+$ ./s83 get -go -o the-daily-spring.html
 ```
 
 #### 7. Enjoy!
 
 In addition to [https://may83.club](https://may83.club). Some other public
-servers you can publish boards to are:
+servers you can publish/follow boards to/from are:
 
 - [https://bogbody.biz](https://bogbody.biz)
 - [https://0l0.lol/](https://0l0.lol/)
 - [https://spring83.kindrobot.ca](https://spring83.kindrobot.ca)
 - [https://spring83.mozz.us](https://spring83.mozz.us/)
+
 
 ## Current Limitations
 
@@ -103,8 +113,8 @@ implemented. A non-exhaustive list of missing features follows.
 	- potentially imprecise error messages
 - client
 	- no "realms"
-	- plaintext only, no DOM/CSP/Formatting
 - Tests
+- Linux only
 
 Development continues. This list should shrink over time as the spec is refined
 and solidifies. The primary purpose at this point is to explore the corners of
@@ -130,7 +140,7 @@ make docker-serve
 You can configure the server by setting enviornment variables:
 
 ```
-./bin/s83d -h
+$ ./s83d -h
 Usage: s83d is designed to be configured using environment variables.
 
 For example: `PORT=8383 ./s83d`
