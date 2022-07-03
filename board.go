@@ -52,6 +52,15 @@ func (b Board) After(ts time.Time) bool {
 	return b.timestamp.After(ts)
 }
 
+func (b Board) SameAs(other Board) bool {
+	sameTime := b.timestamp == other.timestamp
+	sameSig := b.Signature() == other.Signature()
+	sameContent := bytes.Compare(b.Content, other.Content) == 0
+	samePublisher := b.Publisher.String() == other.Publisher.String()
+
+	return sameTime && sameSig && sameContent && samePublisher
+}
+
 // TODO: this clobbers old files, which matches the ephemeral nature of the protocol
 // but may want to provide an option for keeping around old boards.
 func (b Board) Save(dir string) error {
