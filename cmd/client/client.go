@@ -43,10 +43,10 @@ func main() {
 	dryFlag := pubCmd.Bool("dry", false, "dry run, print board locally instead of publishing")
 
 	// Get boards from a server
-	// TODO: add flags to store, launch browser, set mod time (e.g. from local copy)
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	outFlag := getCmd.String("o", "", "output your 'Daily Spring' to a specific path")
 	browseFlag := getCmd.Bool("go", false, "open your 'Daily Spring' in a browser")
+	newOnlyFlag := getCmd.Bool("new", false, "only get new boards")
 
 	cmdOrder := []string{"pub", "get", "new", "who"}
 	cmds := map[string]struct {
@@ -157,7 +157,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		config.Get(getCmd.Arg(0), *outFlag, *browseFlag)
+		config.Get(getCmd.Arg(0), *outFlag, *browseFlag, *newOnlyFlag)
 
 	default:
 		fmt.Printf("invalid command\n\n")
@@ -252,7 +252,7 @@ func publishBoard(server *url.URL, board s83.Board) error {
 // TODO: the client may also scan for arbitrary data stored in
 // data-spring-* attributes throughout the board.
 
-func (config Config) Get(key string, outPath string, browse bool) {
+func (config Config) Get(key string, outPath string, browse bool, newOnly bool) {
 	follows := config.Follows
 
 	// single key specified
@@ -305,6 +305,15 @@ func (config Config) Get(key string, outPath string, browse bool) {
 		newBoards[key] = b
 	}
 
+	if newOnly {
+		if len(newBoards) == 0 {
+			fmt.Println("[info] no new boards")
+			os.Exit(0)
+		}
+		// zero out pre-existing local boards
+		localBoards = map[string]s83.Board{}
+	}
+
 	// if output was not set via a command line flag store at default location
 	if outPath == "" {
 		outPath = config.outPath()
@@ -317,6 +326,7 @@ func (config Config) Get(key string, outPath string, browse bool) {
 	}
 	defer outF.Close()
 
+	// actually write 'The Daily' out to a file
 	config.renderBoards(newBoards, localBoards, outF)
 
 	// output results message
@@ -335,14 +345,13 @@ func (config Config) Get(key string, outPath string, browse bool) {
 		if err != nil {
 			fmt.Printf("[warn] Failed launching a browser: %v\n", err)
 		} else {
-			fmt.Println("[info] Success, check your browser for your 'Daily Spring'")
+			fmt.Println("[info] Success. check your browser for your 'Daily Spring'")
 		}
 	}
 }
 
 func openBrowserToPath(path string) error {
 	// TODO: generalize for other launchers/platform, and better error checking
-	fmt.Println(path)
 	cmd := exec.Command("xdg-open", path)
 	return cmd.Run()
 }
