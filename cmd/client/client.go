@@ -45,6 +45,7 @@ func main() {
 	// Get boards from a server
 	// TODO: add flags to store, launch browser, set mod time (e.g. from local copy)
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
+	outFlag := getCmd.String("o", "", "output your 'Daily Spring' to a specific path")
 	browseFlag := getCmd.Bool("go", false, "open your 'Daily Spring' in a browser")
 
 	cmdOrder := []string{"pub", "get", "new", "who"}
@@ -156,7 +157,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		config.Get(getCmd.Arg(0), *browseFlag)
+		config.Get(getCmd.Arg(0), *outFlag, *browseFlag)
 
 	default:
 		fmt.Printf("invalid command\n\n")
@@ -251,7 +252,7 @@ func publishBoard(server *url.URL, board s83.Board) error {
 // TODO: the client may also scan for arbitrary data stored in
 // data-spring-* attributes throughout the board.
 
-func (config Config) Get(key string, browse bool) {
+func (config Config) Get(key string, outPath string, browse bool) {
 	follows := config.Follows
 
 	// single key specified
@@ -304,7 +305,11 @@ func (config Config) Get(key string, browse bool) {
 		newBoards[key] = b
 	}
 
-	outPath := config.outPath()
+	// if output was not set via a command line flag store at default location
+	if outPath == "" {
+		outPath = config.outPath()
+	}
+
 	outF, err := os.Create(outPath)
 	if err != nil {
 		log.Printf("error: %v\n", err)
