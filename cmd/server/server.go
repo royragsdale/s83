@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"html/template"
 	"log"
 	"math/rand"
 	"net/http"
@@ -26,7 +27,7 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Spring-Version", s83.SpringVersion)
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
 
-	// CORS (TODO: verify details of which requests require it)
+	// Servers must add the appropriate CORS headers to all responses:
 	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-Modified-Since, Spring-Signature, Spring-Version")
@@ -75,19 +76,39 @@ func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
 }
 
 type indexData struct {
-	Title     string
-	Admin     *s83.Publisher
-	NumBoards int
-	TTL       int
+	Title      string
+	NumBoards  int
+	TTL        int
+	AdminBoard *s83.Board
+	TestBoard  *s83.Board
+	ClientCSS  template.CSS
 }
 
 func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) {
 
+	var adminBoard *s83.Board = nil
+	if srv.admin != nil {
+		a, err := srv.store.boardFromKey(srv.admin.String())
+		if err == nil {
+			adminBoard = &a
+		}
+	}
+
+	var testBoard *s83.Board = nil
+	t, err := srv.testBoard()
+	if err == nil {
+		testBoard = &t
+	} else {
+		log.Println("error loading test board for homepage")
+	}
+
 	data := indexData{
 		srv.title,
-		srv.admin,
 		srv.store.NumBoards,
 		srv.ttl,
+		adminBoard,
+		testBoard,
+		s83.ClientCSS,
 	}
 
 	srv.templates.ExecuteTemplate(w, tIndex, data)

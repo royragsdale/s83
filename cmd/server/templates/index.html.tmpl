@@ -18,11 +18,13 @@
             padding: 5px;
             width:60%;
         }
-        iframe {
+        board-elem {
             aspect-ratio: 1 / 1.414;
             height: 60%;
             width: 60%;
             min-width: 300px;
+            border: 1px solid #444;
+            overflow: scroll;
         }
     </style>
     <title>{{.Title}}</title>
@@ -35,13 +37,21 @@
         <tr><td>TTL (days)</td><td>{{.TTL}}</td></tr>
     </table>
 
-    {{if .Admin}}
-    <h2><a href=/{{.Admin}}>Admin Board</a></h2>
-    <iframe src="/{{.Admin}}" title="Admin Board"></iframe>
+    {{if .AdminBoard}}
+    <h2><a href="/{{.AdminBoard.Publisher}}">Admin Board</a></h2>
+    <board-elem class="flex-item" id="board-{{.AdminBoard.Publisher}}"></board-elem>
+    <script>
+        document.getElementById("board-{{.AdminBoard.Publisher}}").attachShadow({mode: 'open'}).innerHTML = {{.ClientCSS}} + {{ .AdminBoard.String}};
+    </script>
     {{end}}
 
-    <h2>Everchanging Test Board</h2>
-    <iframe src="/ab589f4dde9fce4180fcf42c7b05185b0a02a5d682e353fa39177995083e0583" title="Everchanging Test Board"></iframe>
+    {{if .TestBoard}}
+    <h2><a href="{{.TestBoard.Publisher}}">Everchanging Test Board</a></h2>
+    <board-elem class="flex-item" id="board-{{.TestBoard.Publisher}}"></board-elem>
+    <script>
+        document.getElementById("board-{{.TestBoard.Publisher}}").attachShadow({mode: 'open'}).innerHTML = {{.ClientCSS}} + {{ .TestBoard.String}};
+    </script>
+    {{end}}
 
     <p>served by <a href="https://github.com/royragsdale/s83">s83d</a></p>
 </body>
