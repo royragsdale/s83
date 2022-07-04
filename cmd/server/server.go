@@ -15,11 +15,33 @@ import (
 	"github.com/royragsdale/s83"
 )
 
+// convenience for error handling
+// ref: https://go.dev/blog/error-handling-and-go
+type srvHandler func(http.ResponseWriter, *http.Request) error
+
+// satisfy http.Handler
+func (fn srvHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// TODO: add request IP address
+	if err := fn(w, r); err != nil {
+		// intentionally thrown error (e.g. bad requests)
+		if serr, ok := err.(*srvError); ok {
+			if serr.LogError != nil {
+				log.Printf("%s: %v\n", serr.Error(), serr.LogError)
+			}
+			http.Error(w, serr.Error(), serr.Code)
+		} else {
+			// always log unexpected internal errors
+			log.Printf("internal error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
 func (srv *Server) address() string {
 	return fmt.Sprintf("%s:%d", srv.host, srv.port)
 }
 
-func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) handler(w http.ResponseWriter, req *http.Request) error {
 	// Log requests (TODO: configurable verbosity)
 	log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
 
@@ -35,18 +57,15 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 
 	// Servers must support preflight OPTIONS requests to all endpoints
 	if req.Method == http.MethodOptions {
-		srv.handleOptions(w, req)
-		return
+		return srv.handleOptions(w, req)
 	}
 
 	// GET / ("homepage")
 	if req.URL.Path == "/" {
 		if req.Method != http.MethodGet {
-			http.Error(w, "405 - Method Not Allowed: use GET", http.StatusMethodNotAllowed)
-			return
+			return newHTTPError(http.StatusMethodNotAllowed, "use GET")
 		}
-		srv.handleHome(w, req)
-		return
+		return srv.handleHome(w, req)
 	}
 
 	// GET/PUT /<key> (boards)
@@ -56,23 +75,21 @@ func (srv *Server) handler(w http.ResponseWriter, req *http.Request) {
 		key := submatch[1]
 
 		if req.Method == http.MethodGet {
-			srv.handleGetBoard(w, req, key)
-			return
+			return srv.handleGetBoard(w, req, key)
 		} else if req.Method == http.MethodPut {
-			srv.handlePutBoard(w, req, key)
-			return
+			return srv.handlePutBoard(w, req, key)
 		} else {
-			http.Error(w, "405 - Method Not Allowed: use GET/PUT", http.StatusMethodNotAllowed)
-			return
+			return newHTTPError(http.StatusMethodNotAllowed, "use GET/PUT")
 		}
 	}
 
 	// fallthrough failcase
-	http.Error(w, "400 - Bad Request", http.StatusBadRequest)
+	return newHTTPError(http.StatusBadRequest, "invalid key")
 }
 
-func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) handleOptions(w http.ResponseWriter, req *http.Request) error {
 	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 type indexData struct {
@@ -84,19 +101,19 @@ type indexData struct {
 	ClientCSS  template.CSS
 }
 
-func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) {
+func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) error {
 
 	var adminBoard *s83.Board = nil
 	if srv.admin != nil {
-		a, err := srv.store.boardFromKey(srv.admin.String())
-		if err == nil {
+		if a, err := srv.store.boardFromKey(srv.admin.String()); err == nil {
 			adminBoard = &a
+		} else {
+			log.Println("error loading admin board for homepage")
 		}
 	}
 
 	var testBoard *s83.Board = nil
-	t, err := srv.testBoard()
-	if err == nil {
+	if t, err := srv.testBoard(); err == nil {
 		testBoard = &t
 	} else {
 		log.Println("error loading test board for homepage")
@@ -111,7 +128,7 @@ func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) {
 		s83.ClientCSS,
 	}
 
-	srv.templates.ExecuteTemplate(w, tIndex, data)
+	return srv.templates.ExecuteTemplate(w, tIndex, data)
 }
 
 type testData struct {
@@ -141,48 +158,40 @@ func (srv *Server) testBoard() (s83.Board, error) {
 
 }
 
-func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key string) {
+func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key string) error {
 	var board s83.Board
 	var err error
 
 	if srv.blocked(key) {
-		http.Error(w, "403 - Key Blocked", http.StatusForbidden)
-		return
+		return newHTTPError(http.StatusForbidden, "key blocked")
 	}
 
 	// special case
 	// "an ever-changing board...with a timestamp set to the time of the request."
 	if key == s83.TestPublic {
-
 		board, err = srv.testBoard()
 		if err != nil {
-			log.Println("500: failed creating test board:", err)
-			http.Error(w, "500 - Failed generating board", http.StatusInternalServerError)
-			return
+			return newHTTPErrorLog(http.StatusInternalServerError, "failed generating board", err)
 		}
 	} else {
 		board, err = srv.store.boardFromKey(key)
 		if err != nil {
 			// TODO: other errors (internal like)
-			http.Error(w, "404 - Board not found", http.StatusNotFound)
-			return
+			return newHTTPError(http.StatusNotFound, "board not found")
 		}
 	}
 
 	// TODO: handle "tombstone" boards, "404 Not Found"
 
 	if !board.VerifySignature() {
-		log.Println("loaded board with a failed signature", board)
-		http.Error(w, "500 - Bad board", http.StatusInternalServerError)
-		return
+		return newHTTPErrorLog(http.StatusInternalServerError, "bad board", fmt.Errorf("board from store failed signature validation: %s", board.Publisher))
 	}
 
 	if srv.boardExpired(board) {
 		log.Println("removing expired board", board.Publisher)
 		srv.store.removeBoard(board)
 		srv.store.NumBoards -= 1 // TODO: store should keep track
-		http.Error(w, "404 - Board not found", http.StatusNotFound)
-		return
+		return newHTTPError(http.StatusNotFound, "board not found")
 	}
 
 	// <date and time in UTC, RFC 5322 format> TODO: ???
@@ -193,7 +202,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 		// parsed a header and board is not newer than the request. Not Modified.
 		log.Printf("304 - board (%s) not newer than request (%s)\n", board.Timestamp(), modTimeStr)
 		w.WriteHeader(http.StatusNotModified)
-		return
+		return nil
 	}
 
 	// TODO: (optional) special case wrap boards from requests missing a Spring-Version header
@@ -201,6 +210,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 	w.Header().Set("Spring-Signature", board.Signature())
 	// DO NOT "format" board content. It is user supplied.
 	w.Write(board.Content)
+	return nil
 }
 
 func (srv *Server) blocked(key string) bool {
@@ -212,23 +222,20 @@ func (srv *Server) boardExpired(board s83.Board) bool {
 	return !board.After(time.Now().UTC().AddDate(0, 0, -srv.ttl))
 }
 
-func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) {
+func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key string) error {
 
 	if srv.blocked(key) {
-		http.Error(w, "403 - Key Blocked", http.StatusForbidden)
-		return
+		return newHTTPErrorLog(http.StatusForbidden, "key blocked", fmt.Errorf("PUT blocked for key: %s", key))
 	}
 
 	// Validate Board (size, signature, timestamp)
 	board, err := s83.BoardFromHTTP(key, req.Header.Get("Spring-Signature"), req.Body)
 	if err != nil {
 		// TODO: handle 400/401/409/513
-		// 400: Board was submitted with impromper meta timestamp tags.
+		// 400: Board was submitted with improper meta timestamp tags.
 		// 401: Board was submitted without a valid signature.
 		// 413: Board is larger than 2217 bytes.
-		log.Println(err)
-		http.Error(w, "400 - Bad Board", http.StatusBadRequest)
-		return
+		return newHTTPErrorLog(http.StatusBadRequest, "bad board", fmt.Errorf("PUT invalid board for key: %s : %w", key, err))
 	}
 
 	boardUpdate := false
@@ -236,8 +243,7 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	// there was a valid existing board
 	if err == nil {
 		if !board.AfterBoard(existingBoard) {
-			http.Error(w, "409 - Submission older than existing board", http.StatusConflict)
-			return
+			return newHTTPError(http.StatusConflict, "not newer than existing board")
 		}
 		// existing boards are grandfathered
 		boardUpdate = true
@@ -245,14 +251,13 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 
 	// reject boards older than TTL
 	if srv.boardExpired(board) {
-		http.Error(w, "409 - Submission older than server TTL", http.StatusConflict)
-		return
+		return newHTTPError(http.StatusConflict, fmt.Sprintf("older than TTL: %d days", srv.ttl))
 	}
 
 	err = srv.store.saveBoard(board)
 	if err != nil {
 		fmt.Println("error saving board", err)
-		http.Error(w, "500 - Internal Server Error", http.StatusInternalServerError)
+		return newHTTPErrorLog(http.StatusInternalServerError, "", fmt.Errorf("error saving board for key: %s : %w", key, err))
 	} else if !boardUpdate {
 		// TODO: store should keep track
 		// only increment if it is a new (previously unseen) board
@@ -260,6 +265,9 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 	}
 
 	// TODO: queue board up for gossip
+
+	// success
+	return nil
 }
 
 func (srv *Server) favicon(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +284,7 @@ func main() {
 	http.HandleFunc("/favicon.ico", srv.favicon)
 
 	// all API endpoints
-	http.HandleFunc("/", srv.handler)
+	http.Handle("/", srvHandler(srv.handler))
 
 	log.Printf("starting server on %s", srv.address())
 	log.Fatal(http.ListenAndServe(srv.address(), nil))

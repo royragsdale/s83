@@ -52,8 +52,8 @@ func TestPutBoardHandler(t *testing.T) {
 	for key, _ := range blockList {
 		req := NewRequest("PUT", "/"+key, nil, t)
 		rr := httptest.NewRecorder()
-		putFunc := func(w http.ResponseWriter, req *http.Request) { srv.handlePutBoard(w, req, key) }
-		handler := http.HandlerFunc(putFunc)
+		putFunc := func(w http.ResponseWriter, req *http.Request) error { return srv.handlePutBoard(w, req, key) }
+		handler := http.Handler(srvHandler(putFunc))
 		handler.ServeHTTP(rr, req)
 		// Check the status code is what we expect.
 		if status := rr.Code; status != http.StatusForbidden {
