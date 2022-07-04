@@ -42,12 +42,13 @@ func nonce() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (config Config) renderBoards(newBoards map[string]s83.Board, localBoards map[string]s83.Board, outF *os.File) {
+// TODO: clean up follower/single board edge case
+func (config Config) renderBoards(newBoards map[string]s83.Board, localBoards map[string]s83.Board, follows []s83.Follow, outF *os.File) {
 
 	boards := []s83.Board{}
 
 	// simple Follow based ordering (merge new and local boards)
-	for _, f := range config.Follows {
+	for _, f := range follows {
 		key := f.Key()
 		var b s83.Board
 		b, ok := newBoards[key]

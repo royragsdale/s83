@@ -327,7 +327,7 @@ func (config Config) Get(key string, outPath string, browse bool, newOnly bool) 
 	defer outF.Close()
 
 	// actually write 'The Daily' out to a file
-	config.renderBoards(newBoards, localBoards, outF)
+	config.renderBoards(newBoards, localBoards, follows, outF)
 
 	// output results message
 	if errCnt == 0 {
