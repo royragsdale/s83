@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -274,7 +273,7 @@ func (config Config) Get(key string, outPath string, browse bool, newOnly bool) 
 		modTimeStr := ""
 
 		// local local copy (if exists)
-		localBoard, err := s83.BoardFromPath(config.followToPath(f))
+		localBoard, err := config.store.Get(f.Key())
 		if err == nil {
 			// get our copy of the timestamp (only want boards newer than this)
 			modTimeStr = localBoard.Timestamp()
@@ -296,12 +295,12 @@ func (config Config) Get(key string, outPath string, browse bool, newOnly bool) 
 
 		// some servers don't reply Not Modified, making all boards seem new
 		// do a local check to allow follow on styling/alerting
-		if b.SameAs(localBoard) {
+		if b.Eq(localBoard) {
 			continue
 		}
 
 		// Actually got a new board. Save to disk.
-		b.Save(config.DataPath())
+		config.store.Add(b)
 		newBoards[key] = b
 	}
 
@@ -354,10 +353,6 @@ func openBrowserToPath(path string) error {
 	// TODO: generalize for other launchers/platform, and better error checking
 	cmd := exec.Command("xdg-open", path)
 	return cmd.Run()
-}
-
-func (config Config) followToPath(f s83.Follow) string {
-	return filepath.Join(config.DataPath(), fmt.Sprintf("%s.s83", f.Key()))
 }
 
 func exitOnError(err error) {

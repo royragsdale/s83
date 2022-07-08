@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/royragsdale/s83"
+	"github.com/royragsdale/s83/store"
 )
 
 const envHost = "HOST"
@@ -31,7 +32,7 @@ var defaultVars = map[string]string{
 type Server struct {
 	host        string
 	port        int
-	store       *Store
+	store       *store.Store
 	ttl         int // days
 	title       string
 	admin       *s83.Publisher
@@ -78,11 +79,11 @@ func NewServerFromEnv() *Server {
 	}
 
 	// pre load store
-	store, err := loadStore(storePath)
+	store, err := store.New(storePath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("loaded %d boards from store %s", store.NumBoards, store.Dir)
+	log.Printf("loaded %d boards from store %s", store.Count(), storePath)
 
 	// load templates
 	templates := template.Must(template.ParseFS(resources, "templates/*.tmpl"))
