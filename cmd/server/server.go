@@ -189,7 +189,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 	if srv.boardExpired(board) {
 		log.Println("removing expired board", board.Publisher)
-		srv.store.Remove(board)
+		srv.store.Remove(board.Key())
 		return newHTTPError(http.StatusNotFound, "board not found")
 	}
 

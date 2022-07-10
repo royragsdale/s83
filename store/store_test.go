@@ -163,7 +163,7 @@ func TestRemoveBoard(t *testing.T) {
 	}
 
 	// remove on empty store should fail
-	if err = store.Remove(b); err == nil {
+	if err = store.Remove(b.Key()); err == nil {
 		t.Errorf("should error when removing non-existant board: %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestRemoveBoard(t *testing.T) {
 		t.Errorf("inaccurate board count")
 	}
 
-	if err = store.Remove(b); err != nil {
+	if err = store.Remove(b.Key()); err != nil {
 		t.Errorf("error removing valid board: %v", err)
 	}
 

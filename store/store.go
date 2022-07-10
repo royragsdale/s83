@@ -126,7 +126,7 @@ func (s *Store) Add(b s83.Board) error {
 	data := append([]byte(b.Signature()+"\n"), b.Content...)
 	err := os.WriteFile(s.boardToPath(b), data, 0600)
 	if err == nil {
-		// sucessfully saved to disk so update cache
+		// successfully saved to disk so update cache
 		s.cache[b.Key()] = b
 
 		if !overwrite {
@@ -136,14 +136,14 @@ func (s *Store) Add(b s83.Board) error {
 	return err
 }
 
-// Remove deletes a board from disk. If the board does not exist in the store
-// this will return an error.
-func (s *Store) Remove(b s83.Board) error {
+// Remove deletes a board from disk based on key. If the board does not exist
+// in the store this will return an error.
+func (s *Store) Remove(key string) error {
 
 	// proactively remove from cache
-	delete(s.cache, b.Key())
+	delete(s.cache, key)
 
-	err := os.Remove(s.boardToPath(b))
+	err := os.Remove(s.keyToPath(key))
 	if err == nil {
 		s.numBoards -= 1
 	}
