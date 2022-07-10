@@ -187,3 +187,63 @@ func TestRemoveBoard(t *testing.T) {
 		t.Errorf("inaccurate board count")
 	}
 }
+
+func TestCache(t *testing.T) {
+
+	dir := t.TempDir()
+
+	store, err := New(dir)
+	if err != nil {
+		t.Errorf(`error creating empty store:%v`, err)
+	}
+
+	cachedB, err := testBoard(testBytes)
+	if err != nil {
+		t.Fatalf(`Failure making test board: %v`, err)
+	}
+
+	// manually add board to cache
+	store.cache[cachedB.Key()] = cachedB
+
+	fromCacheB, err := store.Get(cachedB.Key())
+	if err != nil {
+		t.Fatalf("error getting cached board: %v", err)
+	}
+	if !cachedB.Eq(fromCacheB) {
+		t.Errorf(`cache returned unexpected board: %v :%v`, cachedB, fromCacheB)
+	}
+
+	// update board and ensure the cache updates
+	newB, err := testBoard([]byte("new board"))
+	if err != nil {
+		t.Fatalf(`Failure making new test board: %v`, err)
+	}
+
+	if err = store.Add(newB); err != nil {
+		t.Errorf("error saving over board in cache")
+	}
+
+	if store.numBoards != 1 {
+		t.Errorf("inaccurate board count")
+	}
+
+	fromCacheB, err = store.Get(newB.Key())
+	if err != nil {
+		t.Fatalf("error getting cached board: %v", err)
+	}
+	if !newB.Eq(fromCacheB) {
+		t.Errorf(`cache returned unexpected board: %v :%v`, newB, fromCacheB)
+	}
+
+	// manually remove from cache to ensure it actually got written to disk
+	delete(store.cache, newB.Key())
+
+	fromDiskB, err := store.Get(newB.Key())
+	if err != nil {
+		t.Fatalf("error getting board from disk: %v", err)
+	}
+	if !newB.Eq(fromDiskB) {
+		t.Errorf(`disk returned unexpected board: %v :%v`, newB, fromDiskB)
+	}
+
+}

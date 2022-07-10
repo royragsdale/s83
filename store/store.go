@@ -6,6 +6,10 @@
 // On disk a board is simply a plain text file named according to the
 // publisher's key. The first line of the file is the signature. Everything
 // else is the content.
+//
+// The store package implements a write through cache that allows read-heavy
+// use cases (like a server, where boards are read much more frequently then
+// they are updated) to primarily operate out of memory.
 package store
 
 import (
@@ -23,10 +27,12 @@ import (
 // allow for future variations with different versions
 const ext = ".s83"
 
+type Cache map[string]s83.Board
+
 type Store struct {
 	dir       string
 	numBoards int
-	//Cache     map[string]s83.Board
+	cache     Cache
 }
 
 // New takes a path to a directory on disk and initializes the backing
@@ -46,7 +52,7 @@ func New(path string) (*Store, error) {
 		return nil, errors.New(fmt.Sprintf("store path (%s) is not a directory", absPath))
 	}
 
-	store := &Store{absPath, 0}
+	store := &Store{absPath, 0, Cache{}}
 
 	return store, store.validate()
 }
@@ -61,11 +67,10 @@ func (s *Store) validate() error {
 
 	for _, boardPath := range matches {
 		key := strings.TrimSuffix(filepath.Base(boardPath), ext)
-
-		//TODO: instead of discarding fill cache
-		_, err := s.Get(key)
+		b, err := s.Get(key)
 		if err == nil {
 			s.numBoards += 1
+			s.cache[key] = b
 		}
 	}
 
@@ -79,6 +84,11 @@ func (s *Store) validate() error {
 // store (e.g. the board does not exist) or based on the contents of the file
 // (e.g. it is an invalid board, the signature fails to verify, etc).
 func (s *Store) Get(key string) (s83.Board, error) {
+	// check cache first
+	if b, ok := s.cache[key]; ok {
+		return b, nil
+	}
+
 	data, err := os.ReadFile(s.keyToPath(key))
 	if err != nil {
 		return s83.Board{}, err
@@ -97,7 +107,13 @@ func (s *Store) Get(key string) (s83.Board, error) {
 	content := data[sigEnd+1:]
 
 	// validate on creation
-	return s83.NewBoard(key, sig, content)
+	b, err := s83.NewBoard(key, sig, content)
+	if err == nil {
+		// valid board, add to cache
+		s.cache[key] = b
+	}
+
+	return b, err
 }
 
 // TODO: consider a variation that keeps a history of boards.
@@ -109,8 +125,13 @@ func (s *Store) Add(b s83.Board) error {
 	overwrite := s.boardExists(b)
 	data := append([]byte(b.Signature()+"\n"), b.Content...)
 	err := os.WriteFile(s.boardToPath(b), data, 0600)
-	if err == nil && !overwrite {
-		s.numBoards += 1
+	if err == nil {
+		// sucessfully saved to disk so update cache
+		s.cache[b.Key()] = b
+
+		if !overwrite {
+			s.numBoards += 1
+		}
 	}
 	return err
 }
@@ -118,6 +139,10 @@ func (s *Store) Add(b s83.Board) error {
 // Remove deletes a board from disk. If the board does not exist in the store
 // this will return an error.
 func (s *Store) Remove(b s83.Board) error {
+
+	// proactively remove from cache
+	delete(s.cache, b.Key())
+
 	err := os.Remove(s.boardToPath(b))
 	if err == nil {
 		s.numBoards -= 1
