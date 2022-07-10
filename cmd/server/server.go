@@ -105,7 +105,7 @@ func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) error {
 
 	var adminBoard *s83.Board = nil
 	if srv.admin != nil {
-		if a, err := srv.store.boardFromKey(srv.admin.String()); err == nil {
+		if a, err := srv.store.Get(srv.admin.String()); err == nil {
 			adminBoard = &a
 		} else {
 			log.Println("error loading admin board for homepage")
@@ -121,7 +121,7 @@ func (srv *Server) handleHome(w http.ResponseWriter, req *http.Request) error {
 
 	data := indexData{
 		srv.title,
-		srv.store.NumBoards,
+		srv.store.Count(),
 		srv.ttl,
 		adminBoard,
 		testBoard,
@@ -174,7 +174,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 			return newHTTPErrorLog(http.StatusInternalServerError, "failed generating board", err)
 		}
 	} else {
-		board, err = srv.store.boardFromKey(key)
+		board, err = srv.store.Get(key)
 		if err != nil {
 			// TODO: other errors (internal like)
 			return newHTTPError(http.StatusNotFound, "board not found")
@@ -189,8 +189,7 @@ func (srv *Server) handleGetBoard(w http.ResponseWriter, req *http.Request, key 
 
 	if srv.boardExpired(board) {
 		log.Println("removing expired board", board.Publisher)
-		srv.store.removeBoard(board)
-		srv.store.NumBoards -= 1 // TODO: store should keep track
+		srv.store.Remove(board.Key())
 		return newHTTPError(http.StatusNotFound, "board not found")
 	}
 
@@ -238,15 +237,10 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 		return newHTTPErrorLog(http.StatusBadRequest, "bad board", fmt.Errorf("PUT invalid board for key: %s : %w", key, err))
 	}
 
-	boardUpdate := false
-	existingBoard, err := srv.store.boardFromKey(key)
-	// there was a valid existing board
-	if err == nil {
-		if !board.AfterBoard(existingBoard) {
-			return newHTTPError(http.StatusConflict, "not newer than existing board")
-		}
-		// existing boards are grandfathered
-		boardUpdate = true
+	existingBoard, err := srv.store.Get(key)
+	// there was a valid existing board to compare against
+	if err == nil && !board.AfterBoard(existingBoard) {
+		return newHTTPError(http.StatusConflict, "not newer than existing board")
 	}
 
 	// reject boards older than TTL
@@ -254,14 +248,10 @@ func (srv *Server) handlePutBoard(w http.ResponseWriter, req *http.Request, key 
 		return newHTTPError(http.StatusConflict, fmt.Sprintf("older than TTL: %d days", srv.ttl))
 	}
 
-	err = srv.store.saveBoard(board)
+	err = srv.store.Add(board)
 	if err != nil {
 		fmt.Println("error saving board", err)
 		return newHTTPErrorLog(http.StatusInternalServerError, "", fmt.Errorf("error saving board for key: %s : %w", key, err))
-	} else if !boardUpdate {
-		// TODO: store should keep track
-		// only increment if it is a new (previously unseen) board
-		srv.store.NumBoards += 1
 	}
 
 	// TODO: queue board up for gossip

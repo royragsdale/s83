@@ -21,7 +21,7 @@ import (
 const SpringVersion = "83"
 
 const KeyLen = 64
-const sigLen = 128
+const SigLen = 128
 const MaxKey uint64 = math.MaxUint64 // 1<<64 - 1 =  (2**64 - 1)
 
 const yearBase = 2000 // update in year 3000
@@ -166,6 +166,10 @@ func NewPublisherFromKey(publicKeyHex string) (Publisher, error) {
 }
 
 func (p Publisher) String() string {
+	return p.Key()
+}
+
+func (p Publisher) Key() string {
 	return hex.EncodeToString(p.PublicKey)
 }
 

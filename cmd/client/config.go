@@ -12,6 +12,7 @@ import (
 	"regexp"
 
 	"github.com/royragsdale/s83"
+	"github.com/royragsdale/s83/store"
 )
 
 const defaultConfigName = "default"
@@ -25,6 +26,7 @@ type Config struct {
 	Creator   s83.Creator
 	Server    *url.URL
 	Follows   []s83.Follow
+	store     *store.Store
 	templates *template.Template
 	Favicon   string
 }
@@ -134,6 +136,12 @@ func parseConfig(data []byte, name string) Config {
 	}
 
 	config.Favicon = base64.StdEncoding.EncodeToString(favicon)
+
+	store, err := store.New(dataPath(name))
+	if err != nil {
+		log.Fatalf("Error loading data store: %v", err)
+	}
+	config.store = store
 
 	return config
 }

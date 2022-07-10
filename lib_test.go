@@ -122,7 +122,7 @@ func TestBoardCreation(t *testing.T) {
 		t.Errorf("Board failed signature verification")
 	}
 
-	if len(board.Signature()) != sigLen {
+	if len(board.Signature()) != SigLen {
 		t.Errorf("Signature should be %d long", KeyLen)
 	}
 
